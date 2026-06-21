@@ -94,7 +94,11 @@ RegisterNetEvent('ps-adminmenu:server:SetJob', function(data, selectedData)
     local data = CheckDataFromKey(data)
     if not data or not CheckPerms(source, data.perms) then return end
     local src = source
-    local playerId, Job, Grade = selectedData["Player"].value, selectedData["Job"].value, selectedData["Grade"].value
+    local playerId, Job, Grade = tonumber(selectedData["Player"].value), selectedData["Job"].value, selectedData["Grade"].value
+    if not playerId then
+        TriggerClientEvent('QBCore:Notify', source, locale("invalid_input"), 'error')
+        return
+    end
     local Player = QBCore.Functions.GetPlayer(playerId)
     if not Player then
         TriggerClientEvent('QBCore:Notify', source, locale("not_online"), 'error')
@@ -127,7 +131,11 @@ RegisterNetEvent('ps-adminmenu:server:SetGang', function(data, selectedData)
     local data = CheckDataFromKey(data)
     if not data or not CheckPerms(source, data.perms) then return end
     local src = source
-    local playerId, Gang, Grade = selectedData["Player"].value, selectedData["Gang"].value, selectedData["Grade"].value
+    local playerId, Gang, Grade = tonumber(selectedData["Player"].value), selectedData["Gang"].value, selectedData["Grade"].value
+    if not playerId then
+        TriggerClientEvent('QBCore:Notify', source, locale("invalid_input"), 'error')
+        return
+    end
     local Player = QBCore.Functions.GetPlayer(playerId)
     if not Player then
         TriggerClientEvent('QBCore:Notify', source, locale("not_online"), 'error')
@@ -157,8 +165,12 @@ RegisterNetEvent("ps-adminmenu:server:SetPerms", function(data, selectedData)
     if not data or not CheckPerms(source, data.perms) then return end
     local src = source
     local rank = selectedData["Permissions"].value
-    local targetId = selectedData["Player"].value
-    local tPlayer = QBCore.Functions.GetPlayer(tonumber(targetId))
+    local targetId = tonumber(selectedData["Player"].value)
+    if not targetId then
+        QBCore.Functions.Notify(src, locale("invalid_input"), "error", 5000)
+        return
+    end
+    local tPlayer = QBCore.Functions.GetPlayer(targetId)
 
     if not tPlayer then
         QBCore.Functions.Notify(src, locale("not_online"), "error", 5000)
@@ -177,7 +189,11 @@ RegisterNetEvent("ps-adminmenu:server:RemoveStress", function(data, selectedData
     if not data or not CheckPerms(source, data.perms) then return end
     local src = source
     local targetId = selectedData['Player (Optional)'] and tonumber(selectedData['Player (Optional)'].value) or src
-    local tPlayer = QBCore.Functions.GetPlayer(tonumber(targetId))
+    if not targetId then
+        QBCore.Functions.Notify(src, locale("invalid_input"), "error", 5000)
+        return
+    end
+    local tPlayer = QBCore.Functions.GetPlayer(targetId)
 
     if not tPlayer then
         QBCore.Functions.Notify(src, locale("not_online"), "error", 5000)

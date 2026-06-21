@@ -12,7 +12,9 @@ end)
 RegisterNetEvent('ps-adminmenu:server:ValidateClientAction', function(key, selectedData, event, perms)
     local src = source
     if not CheckPerms(src, perms) then return end
-    TriggerClientEvent(event, src, key, selectedData)
+    local data = CheckDataFromKey(key)
+    if not data or not data.event then return end
+    TriggerClientEvent(data.event, src, key, selectedData)
 end)
 
 RegisterNetEvent('ps-adminmenu:server:ValidateCommand', function(command, perms)

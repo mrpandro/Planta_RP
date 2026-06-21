@@ -26,16 +26,16 @@ Config.Cityhalls = {
         licenses = {
             ['id_card'] = {
                 label = 'ID Card',
-                cost = 300,
+                cost = 50,
             },
             ['driver_license'] = {
                 label = 'Driver License',
-                cost = 750,
+                cost = 50,
                 metadata = 'driver'
             },
             ['weaponlicense'] = {
                 label = 'Weapon License',
-                cost = 15000,
+                cost = 50,
                 metadata = 'weapon'
             },
         }

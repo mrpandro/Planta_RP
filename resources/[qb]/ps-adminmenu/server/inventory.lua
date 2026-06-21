@@ -1,7 +1,7 @@
 -- Clear Inventory
 RegisterNetEvent('ps-adminmenu:server:ClearInventory', function(data, selectedData)
     local data = CheckDataFromKey(data)
-    if not data or not CheckPerms(data.perms) then return end
+    if not data or not CheckPerms(source, data.perms) then return end
 
     local src = source
     local player = selectedData["Player"].value
@@ -41,16 +41,13 @@ RegisterNetEvent('ps-adminmenu:server:ClearInventoryOffline', function(data, sel
             locale("invcleared", Player.PlayerData.charinfo.firstname .. ' ' .. Player.PlayerData.charinfo.lastname),
             'success', 7500)
     else
-        MySQL.Async.fetchAll("SELECT * FROM players WHERE citizenid = @citizenid", { ['@citizenid'] = citizenId },
-            function(result)
-                if result and result[1] then
-                    MySQL.Async.execute("UPDATE players SET inventory = '{}' WHERE citizenid = @citizenid",
-                        { ['@citizenid'] = citizenId })
-                    QBCore.Functions.Notify(src, "Player's inventory cleared", 'success', 7500)
-                else
-                    QBCore.Functions.Notify(src, locale("player_not_found"), 'error', 7500)
-                end
-            end)
+        local result = MySQL.query.await("SELECT * FROM players WHERE citizenid = ?", { citizenId })
+        if result and result[1] then
+            MySQL.query.await("UPDATE players SET inventory = '{}' WHERE citizenid = ?", { citizenId })
+            QBCore.Functions.Notify(src, "Player's inventory cleared", 'success', 7500)
+        else
+            QBCore.Functions.Notify(src, locale("player_not_found"), 'error', 7500)
+        end
     end
 end)
 

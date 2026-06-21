@@ -11,7 +11,7 @@ QBCore.Functions.CreateCallback('qb-gangmenu:server:GetEmployees', function(sour
 	end
 
 	local employees = {}
-	local players = MySQL.query.await("SELECT * FROM `players` WHERE `gang` LIKE '%" .. gangname .. "%'", {})
+	local players = MySQL.query.await("SELECT * FROM `players` WHERE `gang` LIKE ?", { '%' .. gangname .. '%' })
 	if players[1] ~= nil then
 		for _, value in pairs(players) do
 			local Target = QBCore.Functions.GetPlayerByCitizenId(value.citizenid) or QBCore.Functions.GetOfflinePlayerByCitizenId(value.citizenid)

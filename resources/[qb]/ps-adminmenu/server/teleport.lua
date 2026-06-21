@@ -4,7 +4,8 @@ RegisterNetEvent('ps-adminmenu:server:TeleportToPlayer', function(data, selected
     if not data or not CheckPerms(source, data.perms) then return end
 
     local src = source
-    local player = selectedData["Player"].value
+    local player = tonumber(selectedData["Player"].value)
+    if not player then return end
     local targetPed = GetPlayerPed(player)
     local coords = GetEntityCoords(targetPed)
 
@@ -18,11 +19,12 @@ RegisterNetEvent('ps-adminmenu:server:BringPlayer', function(data, selectedData)
     if not data or not CheckPerms(source, data.perms) then return end
 
     local src = source
-    local targetPed = selectedData["Player"].value
+    local targetId = tonumber(selectedData["Player"].value)
+    if not targetId then return end
     local admin = GetPlayerPed(src)
     local coords = GetEntityCoords(admin)
-    local target = GetPlayerPed(targetPed)
+    local target = GetPlayerPed(targetId)
 
-    CheckRoutingbucket(targetPed, src)
+    CheckRoutingbucket(targetId, src)
     SetEntityCoords(target, coords)
 end)

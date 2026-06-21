@@ -67,7 +67,11 @@ end)
 RegisterNetEvent('ps-adminmenu:server:WarnPlayer', function(data, selectedData)
     local data = CheckDataFromKey(data)
     if not data or not CheckPerms(source, data.perms) then return end
-    local targetId = selectedData["Player"].value
+    local targetId = tonumber(selectedData["Player"].value)
+    if not targetId then
+        QBCore.Functions.Notify(source, locale("invalid_input"), 'error', 7500)
+        return
+    end
     local target = QBCore.Functions.GetPlayer(targetId)
     local reason = selectedData["Reason"].value
     local sender = QBCore.Functions.GetPlayer(source)
@@ -93,7 +97,12 @@ RegisterNetEvent('ps-adminmenu:server:KickPlayer', function(data, selectedData)
     local data = CheckDataFromKey(data)
     if not data or not CheckPerms(source, data.perms) then return end
     local src = source
-    local target = QBCore.Functions.GetPlayer(selectedData["Player"].value)
+    local targetId = tonumber(selectedData["Player"].value)
+    if not targetId then
+        QBCore.Functions.Notify(src, locale("invalid_input"), 'error', 7500)
+        return
+    end
+    local target = QBCore.Functions.GetPlayer(targetId)
     local reason = selectedData["Reason"].value
 
     if not target then
@@ -159,8 +168,11 @@ RegisterNetEvent('ps-adminmenu:server:SetBucket', function(data, selectedData)
     if not data or not CheckPerms(source, data.perms) then return end
 
     local src = source
-    local player = selectedData["Player"].value
-    local bucket = selectedData["Bucket"].value
+    local player = tonumber(selectedData["Player"].value)
+    local bucket = tonumber(selectedData["Bucket"].value)
+    if not player or not bucket then
+        return QBCore.Functions.Notify(src, locale("invalid_input"), 'error', 7500)
+    end
     local currentBucket = GetPlayerRoutingBucket(player)
 
     if bucket == currentBucket then
@@ -177,7 +189,10 @@ RegisterNetEvent('ps-adminmenu:server:GetBucket', function(data, selectedData)
     if not data or not CheckPerms(source, data.perms) then return end
 
     local src = source
-    local player = selectedData["Player"].value
+    local player = tonumber(selectedData["Player"].value)
+    if not player then
+        return QBCore.Functions.Notify(src, locale("invalid_input"), 'error', 7500)
+    end
     local currentBucket = GetPlayerRoutingBucket(player)
 
     QBCore.Functions.Notify(src, locale("bucket_get", player, currentBucket), 'success', 7500)
@@ -189,17 +204,21 @@ RegisterNetEvent('ps-adminmenu:server:GiveMoney', function(data, selectedData)
     if not data or not CheckPerms(source, data.perms) then return end
 
     local src = source
-    local target, amount, moneyType = selectedData["Player"].value, selectedData["Amount"].value,
-        selectedData["Type"].value
-    local Player = QBCore.Functions.GetPlayer(tonumber(target))
+    local target = tonumber(selectedData["Player"].value)
+    local amount = tonumber(selectedData["Amount"].value)
+    local moneyType = selectedData["Type"].value
+    if not target or not amount or amount < 0 or amount > 999999999 then
+        return QBCore.Functions.Notify(src, locale("invalid_input"), 'error', 7500)
+    end
+    local Player = QBCore.Functions.GetPlayer(target)
 
-    if Player == nil then
+    if not Player then
         return QBCore.Functions.Notify(src, locale("not_online"), 'error', 7500)
     end
 
-    Player.Functions.AddMoney(tostring(moneyType), tonumber(amount))
+    Player.Functions.AddMoney(tostring(moneyType), amount)
     QBCore.Functions.Notify(src,
-        locale((moneyType == "crypto" and "give_money_crypto" or "give_money"), tonumber(amount),
+        locale((moneyType == "crypto" and "give_money_crypto" or "give_money"), amount,
             Player.PlayerData.charinfo.firstname .. " " .. Player.PlayerData.charinfo.lastname), "success")
 end)
 
@@ -209,15 +228,21 @@ RegisterNetEvent('ps-adminmenu:server:GiveMoneyAll', function(data, selectedData
     if not data or not CheckPerms(source, data.perms) then return end
 
     local src = source
-    local amount, moneyType = selectedData["Amount"].value, selectedData["Type"].value
+    local amount = tonumber(selectedData["Amount"].value)
+    local moneyType = selectedData["Type"].value
+    if not amount or amount < 0 or amount > 999999999 then
+        return QBCore.Functions.Notify(src, locale("invalid_input"), 'error', 7500)
+    end
     local players = QBCore.Functions.GetPlayers()
 
     for _, v in pairs(players) do
         local Player = QBCore.Functions.GetPlayer(tonumber(v))
-        Player.Functions.AddMoney(tostring(moneyType), tonumber(amount))
-        QBCore.Functions.Notify(src,
-            locale((moneyType == "crypto" and "give_money_all_crypto" or "give_money_all"), tonumber(amount)), "success")
+        if Player then
+            Player.Functions.AddMoney(tostring(moneyType), amount)
+        end
     end
+    QBCore.Functions.Notify(src,
+        locale((moneyType == "crypto" and "give_money_all_crypto" or "give_money_all"), amount), "success")
 end)
 
 -- Take Money
@@ -226,22 +251,26 @@ RegisterNetEvent('ps-adminmenu:server:TakeMoney', function(data, selectedData)
     if not data or not CheckPerms(source, data.perms) then return end
 
     local src = source
-    local target, amount, moneyType = selectedData["Player"].value, selectedData["Amount"].value,
-        selectedData["Type"].value
-    local Player = QBCore.Functions.GetPlayer(tonumber(target))
+    local target = tonumber(selectedData["Player"].value)
+    local amount = tonumber(selectedData["Amount"].value)
+    local moneyType = selectedData["Type"].value
+    if not target or not amount or amount < 0 or amount > 999999999 then
+        return QBCore.Functions.Notify(src, locale("invalid_input"), 'error', 7500)
+    end
+    local Player = QBCore.Functions.GetPlayer(target)
 
-    if Player == nil then
+    if not Player then
         return QBCore.Functions.Notify(src, locale("not_online"), 'error', 7500)
     end
 
-    if Player.PlayerData.money[moneyType] >= tonumber(amount) then
-        Player.Functions.RemoveMoney(moneyType, tonumber(amount), "state-fees")
+    if Player.PlayerData.money[moneyType] and Player.PlayerData.money[moneyType] >= amount then
+        Player.Functions.RemoveMoney(moneyType, amount, "state-fees")
     else
         QBCore.Functions.Notify(src, locale("not_enough_money"), "primary")
     end
 
     QBCore.Functions.Notify(src,
-        locale((moneyType == "crypto" and "take_money_crypto" or "take_money"), tonumber(amount) .. "$",
+        locale((moneyType == "crypto" and "take_money_crypto" or "take_money"), amount .. "$",
             Player.PlayerData.charinfo.firstname .. " " .. Player.PlayerData.charinfo.lastname), "success")
 end)
 
