@@ -19,14 +19,19 @@ QBCore.Functions.CreateCallback('qb-bossmenu:server:GetEmployees', function(sour
 	local src = source
 	local Player = QBCore.Functions.GetPlayer(src)
 
+	if not Player then return end
 	if not Player.PlayerData.job.isboss then
 		ExploitBan(src, 'GetEmployees Exploiting')
 		return
 	end
 
-	local employees = {}
+	if not QBCore.Shared.Jobs[jobname] then
+		cb({})
+		return
+	end
 
-	local players = MySQL.query.await("SELECT * FROM `players` WHERE `job` LIKE '%" .. jobname .. "%'", {})
+	local employees = {}
+	local players = MySQL.query.await("SELECT * FROM `players` WHERE `job` LIKE ?", {"%" .. jobname .. "%"})
 
 	if players[1] ~= nil then
 		for _, value in pairs(players) do

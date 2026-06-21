@@ -1,11 +1,11 @@
-local QBCore = exports['qb-core']:GetCoreObject()
+local QBCore = exports['qb-core']:GetCoreObject({ 'Functions', 'Commands', 'Shared' })
 local Accounts = {}
 local Statements = {}
 
 -- Functions
 
 local function getPlayerAndCitizenId(playerId)
-    local Player = QBCore.Functions.GetPlayer(playerId)
+    local Player = exports['qb-core']:GetPlayer(playerId)
     if not Player then return nil, nil end
     return Player, Player.PlayerData.citizenid
 end
@@ -186,7 +186,7 @@ QBCore.Functions.CreateCallback('qb-banking:server:openATM', function(source, cb
     local src = source
     local Player, citizenid = getPlayerAndCitizenId(src)
     if not Player or not citizenid then return end
-    local bankCards = Player.Functions.GetItemsByName('bank_card')
+    local bankCards = exports['qb-inventory']:GetItemsByName(src, 'bank_card') -- inventory method, not on Player API
     if not bankCards then return TriggerClientEvent('QBCore:Notify', src, Lang:t('error.card'), 'error') end
     local acceptablePins = {}
     for _, bankCard in ipairs(bankCards) do acceptablePins[#acceptablePins + 1] = bankCard.info.cardPin end
@@ -218,8 +218,8 @@ QBCore.Functions.CreateCallback('qb-banking:server:withdraw', function(source, c
     if accountName == 'checking' then
         local accountBalance = Player.PlayerData.money.bank
         if accountBalance < withdrawAmount then return cb({ success = false, message = Lang:t('error.money') }) end
-        Player.Functions.RemoveMoney('bank', withdrawAmount, 'bank withdrawal')
-        Player.Functions.AddMoney('cash', withdrawAmount, 'bank withdrawal')
+        Player.RemoveMoney('bank', withdrawAmount, 'bank withdrawal')
+        Player.AddMoney('cash', withdrawAmount, 'bank withdrawal')
         if not CreateBankStatement(src, 'checking', withdrawAmount, reason, 'withdraw', 'player') then return cb({ success = false, message = Lang:t('error.error') }) end
         cb({ success = true, message = Lang:t('success.withdraw') })
     end
@@ -231,7 +231,7 @@ QBCore.Functions.CreateCallback('qb-banking:server:withdraw', function(source, c
         local accountBalance = GetAccountBalance(accountName)
         if accountBalance < withdrawAmount then return cb({ success = false, message = Lang:t('error.money') }) end
         if not RemoveMoney(accountName, withdrawAmount) then return cb({ success = false, message = Lang:t('error.error') }) end
-        Player.Functions.AddMoney('cash', withdrawAmount, 'bank account: ' .. accountName .. ' withdrawal')
+        Player.AddMoney('cash', withdrawAmount, 'bank account: ' .. accountName .. ' withdrawal')
         if not CreateBankStatement(src, accountName, withdrawAmount, reason, 'withdraw', Accounts[accountName].account_type) then return cb({ success = false, message = Lang:t('error.error') }) end
         cb({ success = true, message = Lang:t('success.withdraw') })
     end
@@ -247,8 +247,8 @@ QBCore.Functions.CreateCallback('qb-banking:server:deposit', function(source, cb
     if accountName == 'checking' then
         local accountBalance = Player.PlayerData.money.cash
         if accountBalance < depositAmount then return cb({ success = false, message = Lang:t('error.money') }) end
-        Player.Functions.RemoveMoney('cash', depositAmount, 'bank deposit')
-        Player.Functions.AddMoney('bank', depositAmount, 'bank deposit')
+        Player.RemoveMoney('cash', depositAmount, 'bank deposit')
+        Player.AddMoney('bank', depositAmount, 'bank deposit')
         if not CreateBankStatement(src, 'checking', depositAmount, reason, 'deposit', 'player') then return cb({ success = false, message = Lang:t('error.error') }) end
         cb({ success = true, message = Lang:t('success.deposit') })
     end
@@ -258,7 +258,7 @@ QBCore.Functions.CreateCallback('qb-banking:server:deposit', function(source, cb
         if Accounts[accountName].account_type == 'job' and job.name ~= accountName and not job.isboss then return cb({ success = false, message = Lang:t('error.access') }) end
         if Accounts[accountName].account_type == 'gang' and gang.name ~= accountName and not gang.isboss then return cb({ success = false, message = Lang:t('error.access') }) end
         if Player.PlayerData.money.cash < depositAmount then return cb({ success = false, message = Lang:t('error.money') }) end
-        Player.Functions.RemoveMoney('cash', depositAmount, 'bank account: ' .. accountName .. ' deposit')
+        Player.RemoveMoney('cash', depositAmount, 'bank account: ' .. accountName .. ' deposit')
         if not AddMoney(accountName, depositAmount) then return cb({ success = false, message = Lang:t('error.error') }) end
         cb({ success = true, message = Lang:t('success.deposit') })
     end
@@ -276,9 +276,9 @@ QBCore.Functions.CreateCallback('qb-banking:server:internalTransfer', function(s
     local reason = (data.reason ~= '' and data.reason) or 'Internal transfer'
     if fromAccountName == 'checking' then
         if Player.PlayerData.money.bank < transferAmount then return cb({ success = false, message = Lang:t('error.money') }) end
-        Player.Functions.RemoveMoney('bank', transferAmount, reason)
+        Player.RemoveMoney('bank', transferAmount, reason)
         if toAccountName == 'checking' then
-            Player.Functions.AddMoney('bank', transferAmount, reason)
+            Player.AddMoney('bank', transferAmount, reason)
         else
             if not AddMoney(toAccountName, transferAmount) then return cb({ success = false, message = Lang:t('error.error') }) end
         end
@@ -290,7 +290,7 @@ QBCore.Functions.CreateCallback('qb-banking:server:internalTransfer', function(s
         local fromAccountBalance = GetAccountBalance(fromAccountName)
         if fromAccountBalance < transferAmount then return cb({ success = false, message = Lang:t('error.money') }) end
         if not RemoveMoney(fromAccountName, transferAmount) then return cb({ success = false, message = Lang:t('error.error') }) end
-        Player.Functions.AddMoney('bank', transferAmount, reason)
+        Player.AddMoney('bank', transferAmount, reason)
         if not CreateBankStatement(src, 'checking', transferAmount, reason, 'deposit', 'player') then return cb({ success = false, message = Lang:t('error.error') }) end
         cb({ success = true, message = Lang:t('success.transfer') })
     else
@@ -311,15 +311,15 @@ QBCore.Functions.CreateCallback('qb-banking:server:externalTransfer', function(s
     local job = Player.PlayerData.job
     local gang = Player.PlayerData.gang
     local toAccountName = data.toAccountNumber
-    local toPlayer = QBCore.Functions.GetPlayerByCitizenId(toAccountName)
+    local toPlayer = exports['qb-core']:GetPlayerByCitizenId(toAccountName)
     if not toPlayer then return cb({ success = false, message = Lang:t('error.error') }) end
     local fromAccountName = data.fromAccountName
     local transferAmount = tonumber(data.amount)
     local reason = (data.reason ~= '' and data.reason) or 'External transfer'
     if fromAccountName == 'checking' then
         if Player.PlayerData.money.bank < transferAmount then return cb({ success = false, message = Lang:t('error.money') }) end
-        Player.Functions.RemoveMoney('bank', transferAmount, reason)
-        toPlayer.Functions.AddMoney('bank', transferAmount, reason)
+        Player.RemoveMoney('bank', transferAmount, reason)
+        toPlayer.AddMoney('bank', transferAmount, reason)
         if not CreateBankStatement(src, 'checking', transferAmount, reason, 'withdraw', 'player') then return cb({ success = false, message = Lang:t('error.error') }) end
         if not CreateBankStatement(toPlayer.PlayerData.source, 'checking', transferAmount, reason, 'deposit', 'player') then return cb({ success = false, message = Lang:t('error.error') }) end
         cb({ success = true, message = Lang:t('success.transfer') })
@@ -329,7 +329,7 @@ QBCore.Functions.CreateCallback('qb-banking:server:externalTransfer', function(s
         local fromAccountBalance = GetAccountBalance(fromAccountName)
         if fromAccountBalance < transferAmount then return cb({ success = false, message = Lang:t('error.money') }) end
         if not RemoveMoney(fromAccountName, transferAmount) then return cb({ success = false, message = Lang:t('error.error') }) end
-        toPlayer.Functions.AddMoney('bank', transferAmount, reason)
+        toPlayer.AddMoney('bank', transferAmount, reason)
         if not CreateBankStatement(toPlayer.PlayerData.source, 'checking', transferAmount, reason, 'deposit', 'player') then return cb({ success = false, message = Lang:t('error.error') }) end
         cb({ success = true, message = Lang:t('success.transfer') })
     end
@@ -360,7 +360,7 @@ QBCore.Functions.CreateCallback('qb-banking:server:openAccount', function(source
     local initialAmount = tonumber(data.amount)
     if GetNumberOfAccounts(citizenid) >= Config.maxAccounts then return cb({ success = false, message = Lang:t('error.accounts') }) end
     if Player.PlayerData.money.bank < initialAmount then return cb({ success = false, message = Lang:t('error.money') }) end
-    Player.Functions.RemoveMoney('bank', initialAmount, 'Opened account ' .. accountName)
+    Player.RemoveMoney('bank', initialAmount, 'Opened account ' .. accountName)
     if not CreatePlayerAccount(src, accountName, initialAmount, json.encode({})) then return cb({ success = false, message = Lang:t('error.error') }) end
     if not CreateBankStatement(src, accountName, initialAmount, 'Initial deposit', 'deposit', 'shared') then return cb({ success = false, message = Lang:t('error.error') }) end
     if not CreateBankStatement(src, 'checking', initialAmount, 'Initial deposit for ' .. accountName, 'withdraw', 'player') then return cb({ success = false, message = Lang:t('error.error') }) end
@@ -451,9 +451,9 @@ end)
 -- Items
 
 QBCore.Functions.CreateUseableItem('bank_card', function(source, item)
-    local Player = QBCore.Functions.GetPlayer(source)
+    local Player = exports['qb-core']:GetPlayer(source)
     if not Player then return end
-    if Player.Functions.GetItemByName(item.name) then
+    if exports['qb-inventory']:GetItemByName(source, item.name) then -- inventory method, not on Player API
         TriggerClientEvent('qb-banking:client:useCard', source)
     end
 end)
@@ -492,11 +492,11 @@ end)
 
 QBCore.Commands.Add('givecash', 'Give Cash', { { name = 'id', help = 'Player ID' }, { name = 'amount', help = 'Amount' } }, true, function(source, args)
     local src = source
-    local Player = QBCore.Functions.GetPlayer(src)
+    local Player = exports['qb-core']:GetPlayer(src)
     if not Player then return end
     local playerPed = GetPlayerPed(src)
     local playerCoords = GetEntityCoords(playerPed)
-    local target = QBCore.Functions.GetPlayer(tonumber(args[1]))
+    local target = exports['qb-core']:GetPlayer(tonumber(args[1]))
     if not target then return TriggerClientEvent('QBCore:Notify', src, Lang:t('error.noUser'), 'error') end
     local targetPed = GetPlayerPed(tonumber(args[1]))
     local targetCoords = GetEntityCoords(targetPed)
@@ -505,8 +505,8 @@ QBCore.Commands.Add('givecash', 'Give Cash', { { name = 'id', help = 'Player ID'
     if amount <= 0 then return TriggerClientEvent('QBCore:Notify', src, Lang:t('error.amount'), 'error') end
     if #(playerCoords - targetCoords) > 5 then return TriggerClientEvent('QBCore:Notify', src, Lang:t('error.toofar'), 'error') end
     if Player.PlayerData.money.cash < amount then return TriggerClientEvent('QBCore:Notify', src, Lang:t('error.money'), 'error') end
-    Player.Functions.RemoveMoney('cash', amount, 'cash transfer')
-    target.Functions.AddMoney('cash', amount, 'cash transfer')
+    Player.RemoveMoney('cash', amount, 'cash transfer')
+    target.AddMoney('cash', amount, 'cash transfer')
     TriggerClientEvent('QBCore:Notify', src, string.format(Lang:t('success.give'), amount), 'success')
     TriggerClientEvent('QBCore:Notify', target.PlayerData.source, string.format(Lang:t('success.receive'), amount), 'success')
 end)

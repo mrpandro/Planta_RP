@@ -51,15 +51,7 @@ SetupDetails = function(data) {
     $(".vehicle-brand").find(".vehicle-answer").html(data.brand);
     $(".vehicle-model").find(".vehicle-answer").html(data.model);
     $(".vehicle-plate").find(".vehicle-answer").html(data.plate);
-
-    // --- AQUI ESTÁ A CORREÇÃO DO INFO.HOUSE ---
-    if (data.garage == "info.house") {
-        $(".vehicle-garage").find(".vehicle-answer").html("Garagem de Casa");
-    } else {
-        $(".vehicle-garage").find(".vehicle-answer").html(data.garage);
-    }
-    // ------------------------------------------
-
+    $(".vehicle-garage").find(".vehicle-answer").html(data.garage);
     $(".vehicle-status").find(".vehicle-answer").html(data.state);
     $(".vehicle-fuel").find(".vehicle-answer").html(Math.ceil(data.fuel)+"%");
     $(".vehicle-engine").find(".vehicle-answer").html(Math.ceil(data.engine / 10)+"%");

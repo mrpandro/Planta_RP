@@ -120,10 +120,22 @@ AddEventHandler('simple-repair:client:AnimacaoReparacao', function()
     end
 end)
 
--- 3. Aplicar o Fix (Igual ao anterior)
+-- 3. Aplicar o Fix (server-validated)
 RegisterNetEvent('simple-repair:client:AplicarFix')
-AddEventHandler('simple-repair:client:AplicarFix', function()
-    if VeiculoParaReparar and DoesEntityExist(VeiculoParaReparar) then
+AddEventHandler('simple-repair:client:AplicarFix', function(serverVehicleNetId)
+    if not VeiculoParaReparar then
+        QBCore.Functions.Notify("Erro: Nenhum veículo selecionado!", "error")
+        return
+    end
+
+    local clientNetId = NetworkGetNetworkIdFromEntity(VeiculoParaReparar)
+    if clientNetId ~= serverVehicleNetId then
+        QBCore.Functions.Notify("Erro: Veículo inválido!", "error")
+        VeiculoParaReparar = nil
+        return
+    end
+
+    if DoesEntityExist(VeiculoParaReparar) then
         SetVehicleDoorOpen(VeiculoParaReparar, 4, false, false)
         Wait(1000)
         SetVehicleFixed(VeiculoParaReparar)

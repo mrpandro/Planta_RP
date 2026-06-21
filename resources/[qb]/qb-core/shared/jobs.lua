@@ -1,6 +1,5 @@
-QBShared = QBShared or {}
-QBShared.ForceJobDefaultDutyAtLogin = true -- true: Forçar entrada em serviço ao logar | false: manter ultimo estado
-QBShared.Jobs = {
+QBCore.Shared.ForceJobDefaultDutyAtLogin = true -- true: Forçar entrada em serviço ao logar | false: manter ultimo estado
+QBCore.Shared.Jobs = {
     -- CVIS E GENÉRICOS
     unemployed = { label = 'Civil', defaultDuty = true, offDutyPay = false, grades = { ['0'] = { name = 'Desempregado', payment = 25 } } },
     
@@ -117,6 +116,58 @@ QBShared.Jobs = {
             ['2'] = { name = 'Tuner', payment = 165 },
             ['3'] = { name = 'Especialista', payment = 210 },
             ['4'] = { name = 'Boss', isboss = true, payment = 260 },
+        },
+    },
+    mechanic = {
+        label = 'Mecânico',
+        type = 'mechanic',
+        defaultDuty = true,
+        offDutyPay = false,
+        grades = {
+            ['0'] = { name = 'Recruta', payment = 50 },
+            ['1'] = { name = 'Novato', payment = 75 },
+            ['2'] = { name = 'Experiente', payment = 100 },
+            ['3'] = { name = 'Avançado', payment = 125 },
+            ['4'] = { name = 'Gerente', isboss = true, payment = 150 },
+        },
+    },
+    mechanic2 = {
+        label = 'Mecânico 2',
+        type = 'mechanic',
+        defaultDuty = true,
+        offDutyPay = false,
+        grades = {
+            ['0'] = { name = 'Recruta', payment = 50 },
+            ['1'] = { name = 'Novato', payment = 75 },
+            ['2'] = { name = 'Experiente', payment = 100 },
+            ['3'] = { name = 'Avançado', payment = 125 },
+            ['4'] = { name = 'Gerente', isboss = true, payment = 150 },
+        },
+    },
+    mechanic3 = {
+        label = 'Mecânico 3',
+        type = 'mechanic',
+        defaultDuty = true,
+        offDutyPay = false,
+        grades = {
+            ['0'] = { name = 'Recruta', payment = 50 },
+            ['1'] = { name = 'Novato', payment = 75 },
+            ['2'] = { name = 'Experiente', payment = 100 },
+            ['3'] = { name = 'Avançado', payment = 125 },
+            ['4'] = { name = 'Gerente', isboss = true, payment = 150 },
+        },
+    },
+    beeker = {
+        label = 'Beeker''s Garage',
+        type = 'mechanic',
+        defaultDuty = true,
+        offDutyPay = false,
+        grades = {
+            ['0'] = { name = 'Recruta', payment = 50 },
+            ['1'] = { name = 'Novato', payment = 75 },
+            ['2'] = { name = 'Experiente', payment = 100 },
+            ['3'] = { name = 'Avançado', payment = 125 },
+            ['4'] = { name = 'Gerente', isboss = true, payment = 150 },
         },
     },
 }

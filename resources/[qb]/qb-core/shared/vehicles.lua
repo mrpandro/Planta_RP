@@ -1,5 +1,4 @@
-QBShared = QBShared or {}
-QBShared.Vehicles = QBShared.Vehicles or {}
+QBCore.Shared.Vehicles = QBCore.Shared.Vehicles or {}
 
 local Vehicles = {
     --- Compacts (0)
@@ -354,8 +353,6 @@ local Vehicles = {
     { model = 'pipistrello',     name = 'Pipistrello',                   brand = 'Overflod',        price = 240000,  category = 'sports',         type = 'automobile', shop = 'luxury' },
     { model = 'niobe',           name = 'Niobe',                         brand = 'Ubermacht',       price = 180000,  category = 'sports',         type = 'automobile', shop = 'luxury' },
     { model = 'driftvorschlag',  name = 'Vorschlaghammer',               brand = 'Pfister',         price = 250000,  category = 'sports',         type = 'automobile', shop = 'luxury' },
-    { model = '488',             name = 'Ferrari 488 GTB 2016',          brand = 'Ferrari',         price = 2700000, category = 'sports',         type = 'automobile', shop = 'luxury' },
-    { model = 'tw_p918s15',      name = 'Pfister 918 Spyder 2015',       brand = 'Pfister',         price = 2700000, category = 'sports',         type = 'automobile', shop = 'luxury' },
     --- Super (7)
     { model = 'adder',           name = 'Adder',                         brand = 'Truffade',        price = 280000,  category = 'super',          type = 'automobile', shop = 'luxury' },
     { model = 'autarch',         name = 'Autarch',                       brand = 'Överflöd',        price = 224000,  category = 'super',          type = 'automobile', shop = 'luxury' },
@@ -408,7 +405,6 @@ local Vehicles = {
     { model = 'entity3',         name = 'Entity MT',                     brand = 'Overflod',        price = 200000,  category = 'super',          type = 'automobile', shop = 'luxury' },
     { model = 'virtue',          name = 'Virtue',                        brand = 'Ocelot',          price = 72000,   category = 'super',          type = 'automobile', shop = 'luxury' },
     { model = 'turismo3',        name = 'Turismo Omaggio',               brand = 'Grotti',          price = 284500,  category = 'super',          type = 'automobile', shop = 'luxury' },
-    { model = 'g63trg',          name = 'Mercedes G63',                  brand = 'Mercedes',        price = 3000000, category = 'super',          type = 'automobile',  shop = 'luxury' },
     --- Motorcycles (8)
     { model = 'akuma',           name = 'Akuma',                         brand = 'Dinka',           price = 55000,   category = 'motorcycles',    type = 'bike',       shop = 'pdm' },
     { model = 'avarus',          name = 'Avarus',                        brand = 'LCC',             price = 20000,   category = 'motorcycles',    type = 'bike',       shop = 'pdm' },
@@ -438,6 +434,7 @@ local Vehicles = {
     { model = 'gargoyle',        name = 'Gargoyle',                      brand = 'Western',         price = 32000,   category = 'motorcycles',    type = 'bike',       shop = 'pdm' },
     { model = 'hakuchou',        name = 'Hakuchou',                      brand = 'Shitzu',          price = 17000,   category = 'motorcycles',    type = 'bike',       shop = 'pdm' },
     { model = 'hakuchou2',       name = 'Hakuchou Drag',                 brand = 'Shitzu',          price = 45000,   category = 'motorcycles',    type = 'bike',       shop = 'pdm' },
+    { model = 'hexer',           name = 'Hexer',                         brand = 'LCC',             price = 16000,   category = 'motorcycles',    type = 'bike',       shop = 'pdm' },
     { model = 'innovation',      name = 'Innovation',                    brand = 'LLC',             price = 33500,   category = 'motorcycles',    type = 'bike',       shop = 'pdm' },
     { model = 'lectro',          name = 'Lectro',                        brand = 'Principe',        price = 28000,   category = 'motorcycles',    type = 'bike',       shop = 'pdm' },
     { model = 'manchez',         name = 'Manchez',                       brand = 'Maibatsu',        price = 8300,    category = 'motorcycles',    type = 'bike',       shop = 'pdm' },
@@ -466,9 +463,6 @@ local Vehicles = {
     { model = 'manchez3',        name = 'Manchez Scout Classic',         brand = 'Maibatsu',        price = 15000,   category = 'motorcycles',    type = 'bike',       shop = 'pdm' },
     { model = 'powersurge',      name = 'Powersurge',                    brand = 'Western',         price = 7000,    category = 'motorcycles',    type = 'bike',       shop = 'pdm' },
     { model = 'pizzaboy',        name = 'Pizza Boy',                     brand = 'Pegassi',         price = 50000,   category = 'motorcycles',    type = 'bike',       shop = 'pdm' },
-    { model = '25cb1000',        name = 'CB1000',                     brand = 'Honda',         price = 80000,   category = 'motorcycles',    type = 'bike',       shop = 'pdm' },
-    { model = 'hexer',        name = 'Harley Davidson Fat Boy',                     brand = 'Harley',         price = 80000,   category = 'motorcycles',    type = 'bike',       shop = 'pdm' },
-    
     --- Off-Road (9)
     { model = 'bfinjection',     name = 'Bf Injection',                  brand = 'Annis',           price = 9000,    category = 'offroad',        type = 'automobile', shop = 'pdm' },
     { model = 'bifta',           name = 'Bifta',                         brand = 'Annis',           price = 15500,   category = 'offroad',        type = 'automobile', shop = 'pdm' },
@@ -507,8 +501,6 @@ local Vehicles = {
     { model = 'draugur',         name = 'Draugur',                       brand = 'Declasse',        price = 99000,   category = 'offroad',        type = 'automobile', shop = 'pdm' },
     { model = 'terminus',        name = 'Terminus',                      brand = 'Canis',           price = 187750,  category = 'offroad',        type = 'automobile', shop = 'pdm' },
     { model = 'yosemite4',       name = 'Yosemite 1500',                 brand = 'Declasse',        price = 187750,  category = 'offroad',        type = 'automobile', shop = 'pdm' },
-    { model = 'v8truck',       name = 'Truck V8',                 brand = 'Truck',        price = 1000000,  category = 'offroad',        type = 'automobile', shop = 'pdm' },
-
     --- Industrial (10)
     { model = 'guardian',        name = 'Guardian',                      brand = 'Vapid',           price = 30000,   category = 'industrial',     type = 'automobile', shop = 'truck' },
     { model = 'mixer2',          name = 'Mixer II',                      brand = 'HVY',             price = 30000,   category = 'industrial',     type = 'automobile', shop = 'truck' },
@@ -711,7 +703,7 @@ local Vehicles = {
     { model = 'policet',         name = 'Police Transporter',            brand = 'Vapid',           price = 110000,  category = 'emergency',      type = 'automobile', shop = 'none' },
     { model = 'policeb',         name = 'Police Bike',                   brand = 'Vapid',           price = 110000,  category = 'emergency',      type = 'automobile', shop = 'none' },
     { model = 'polmav',          name = 'Police Maverick',               brand = 'Buckingham',      price = 110000,  category = 'emergency',      type = 'automobile', shop = 'none' },
-    { model = 'ambulance',       name = 'Ambulance',                     brand = 'Ford',            price = 110000,  category = 'emergency',      type = 'automobile', shop = 'none' },
+    { model = 'ambulance',       name = 'Ambulance',                     brand = 'Brute',           price = 110000,  category = 'emergency',      type = 'automobile', shop = 'none' },
     { model = 'firetruk',        name = 'Fire Truck',                    brand = 'MTL',             price = 110000,  category = 'emergency',      type = 'automobile', shop = 'none' },
     { model = 'lguard',          name = 'Lifeguard',                     brand = 'Declasse',        price = 110000,  category = 'emergency',      type = 'automobile', shop = 'none' },
     { model = 'seashark2',       name = 'Seashark Lifeguard',            brand = 'Speedophile',     price = 40000,   category = 'emergency',      type = 'automobile', shop = 'none' },
@@ -772,10 +764,10 @@ local Vehicles = {
     { model = 'formula',         name = 'PR4',                           brand = 'Progen',          price = 100000,  category = 'openwheel',      type = 'automobile', shop = 'none' },
 }
 
-QBShared.VehicleHashes = QBShared.VehicleHashes or {}
+QBCore.Shared.VehicleHashes = QBCore.Shared.VehicleHashes or {}
 for i = 1, #Vehicles do
     local hash = joaat(Vehicles[i].model)
-    QBShared.Vehicles[Vehicles[i].model] = {
+    QBCore.Shared.Vehicles[Vehicles[i].model] = {
         spawncode = Vehicles[i].model,
         name = Vehicles[i].name,
         brand = Vehicles[i].brand,
@@ -786,5 +778,5 @@ for i = 1, #Vehicles do
         type = Vehicles[i].type,
         shop = Vehicles[i].shop
     }
-    QBShared.VehicleHashes[hash] = QBShared.Vehicles[Vehicles[i].model]
+    QBCore.Shared.VehicleHashes[hash] = QBCore.Shared.Vehicles[Vehicles[i].model]
 end

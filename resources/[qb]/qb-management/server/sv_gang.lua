@@ -5,13 +5,19 @@ QBCore.Functions.CreateCallback('qb-gangmenu:server:GetEmployees', function(sour
 	local src = source
 	local Player = QBCore.Functions.GetPlayer(src)
 
+	if not Player then return end
 	if not Player.PlayerData.gang.isboss then
 		ExploitBan(src, 'GetEmployees Exploiting')
 		return
 	end
 
+	if not QBCore.Shared.Gangs[gangname] then
+		cb({})
+		return
+	end
+
 	local employees = {}
-	local players = MySQL.query.await("SELECT * FROM `players` WHERE `gang` LIKE '%" .. gangname .. "%'", {})
+	local players = MySQL.query.await("SELECT * FROM `players` WHERE `gang` LIKE ?", {"%" .. gangname .. "%"})
 	if players[1] ~= nil then
 		for _, value in pairs(players) do
 			local Target = QBCore.Functions.GetPlayerByCitizenId(value.citizenid) or QBCore.Functions.GetOfflinePlayerByCitizenId(value.citizenid)

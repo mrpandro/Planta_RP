@@ -1,6 +1,3 @@
--- Player load and unload handling
--- New method for checking if logged in across all scripts (optional)
--- if LocalPlayer.state['isLoggedIn'] then
 RegisterNetEvent('QBCore:Client:OnPlayerLoaded', function()
     ShutdownLoadingScreenNui()
     LocalPlayer.state:set('isLoggedIn', true, false)
@@ -17,6 +14,7 @@ RegisterNetEvent('QBCore:Client:PvpHasToggled', function(pvp_state)
     SetCanAttackFriendly(PlayerPedId(), pvp_state, false)
     NetworkSetFriendlyFireOption(pvp_state)
 end)
+
 -- Teleport Commands
 
 RegisterNetEvent('QBCore:Command:TeleportToPlayer', function(coords)
@@ -43,10 +41,8 @@ RegisterNetEvent('QBCore:Command:GoToMarker', function()
 
     -- Fade screen to hide how clients get teleported.
     DoScreenFadeOut(650)
-    local fadeTimeout = 0
-    while not IsScreenFadedOut() and fadeTimeout < 100 do
-        Wait(10)
-        fadeTimeout = fadeTimeout + 1
+    while not IsScreenFadedOut() do
+        Wait(0)
     end
 
     local ped, coords <const> = PlayerPedId(), GetBlipInfoIdCoord(blipMarker)
@@ -71,35 +67,31 @@ RegisterNetEvent('QBCore:Command:GoToMarker', function()
 
         NewLoadSceneStart(x, y, z, x, y, z, 50.0, 0)
         local curTime = GetGameTimer()
-        local sceneTimeout = 0
-        while IsNetworkLoadingScene() and sceneTimeout < 100 do
+        while IsNetworkLoadingScene() do
             if GetGameTimer() - curTime > 1000 then
                 break
             end
-            Wait(10)
-            sceneTimeout = sceneTimeout + 1
+            Wait(0)
         end
         NewLoadSceneStop()
         SetPedCoordsKeepVehicle(ped, x, y, z)
 
-        local collisionTimeout = 0
-        while not HasCollisionLoadedAroundEntity(ped) and collisionTimeout < 100 do
+        while not HasCollisionLoadedAroundEntity(ped) do
             RequestCollisionAtCoord(x, y, z)
             if GetGameTimer() - curTime > 1000 then
                 break
             end
-            Wait(10)
-            collisionTimeout = collisionTimeout + 1
+            Wait(0)
         end
 
         -- Get ground coord. As mentioned in the natives, this only works if the client is in render distance.
         found, groundZ = GetGroundZFor_3dCoord(x, y, z, false);
         if found then
-            Wait(10)
+            Wait(0)
             SetPedCoordsKeepVehicle(ped, x, y, groundZ)
             break
         end
-        Wait(10)
+        Wait(0)
     end
 
     -- Remove black screen once the loop has ended.
@@ -188,22 +180,21 @@ end)
 
 -- Other stuff
 
-RegisterNetEvent('QBCore:Player:SetPlayerData', function(val)
-    QBCore.PlayerData = val
-end)
-
-RegisterNetEvent('QBCore:Player:UpdatePlayerData', function()
-    TriggerServerEvent('QBCore:UpdatePlayer')
+RegisterNetEvent('QBCore:Client:OnPlayerUpdated', function(key, val)
+    if key == 'all' then
+        QBCore.PlayerData = val
+        TriggerEvent('QBCore:Player:SetPlayerData', val)
+        TriggerEvent('QBCore:Client:OnJobUpdate', val.job)
+        TriggerEvent('QBCore:Client:OnGangUpdate', val.gang)
+    elseif QBCore.PlayerData and key then
+        QBCore.PlayerData[key] = val
+        if key == 'job' then TriggerEvent('QBCore:Client:OnJobUpdate', val) end
+        if key == 'gang' then TriggerEvent('QBCore:Client:OnGangUpdate', val) end
+    end
 end)
 
 RegisterNetEvent('QBCore:Notify', function(text, type, length, icon)
     QBCore.Functions.Notify(text, type, length, icon)
-end)
-
--- This event is exploitable and should not be used. It has been deprecated, and will be removed soon.
-RegisterNetEvent('QBCore:Client:UseItem', function(item)
-    QBCore.Debug(string.format('%s triggered QBCore:Client:UseItem by ID %s with the following data. This event is deprecated due to exploitation, and will be removed soon. Check qb-inventory for the right use on this event.', GetInvokingResource(), GetPlayerServerId(PlayerId())))
-    QBCore.Debug(item)
 end)
 
 RegisterNUICallback('getNotifyConfig', function(_, cb)

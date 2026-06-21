@@ -1,15 +1,15 @@
 Config = {}
 Config.UsingTarget = GetConvar('UseTarget', 'false') == 'true'
-Config.Commission = 0.10                              -- Percent that goes to sales person from a full car sale 10%
-Config.FinanceCommission = 0.05                       -- Percent that goes to sales person from a finance sale 5%
-Config.PaymentWarning = 10                            -- time in minutes that player has to make payment before repo
-Config.PaymentInterval = 24                           -- time in hours between payment being due
-Config.MinimumDown = 20                               -- minimum percentage allowed down
-Config.MaximumPayments = 18                           -- maximum payments allowed
-Config.PreventFinanceSelling = false                  -- allow/prevent players from using /transfervehicle if financed
-Config.FilterByMake = false                           -- adds a make list before selecting category in shops
-Config.SortAlphabetically = true                      -- will sort make, category, and vehicle selection menus alphabetically
-Config.HideCategorySelectForOne = true                -- will hide the category selection menu if a shop only sells one category of vehicle or a make has only one category
+Config.Commission = 0.10               -- Percent that goes to sales person from a full car sale 10%
+Config.FinanceCommission = 0.05        -- Percent that goes to sales person from a finance sale 5%
+Config.PaymentWarning = 10             -- time in minutes that player has to make payment before repo
+Config.PaymentInterval = 24            -- time in hours between payment being due
+Config.MinimumDown = 10                -- minimum percentage allowed down
+Config.MaximumPayments = 24            -- maximum payments allowed
+Config.PreventFinanceSelling = false   -- allow/prevent players from using /transfervehicle if financed
+Config.FilterByMake = false            -- adds a make list before selecting category in shops
+Config.SortAlphabetically = true       -- will sort make, category, and vehicle selection menus alphabetically
+Config.HideCategorySelectForOne = true -- will hide the category selection menu if a shop only sells one category of vehicle or a make has only one category
 Config.Shops = {
     ['pdm'] = {
         ['Type'] = 'free-use', -- no player interaction is required to purchase a car
@@ -36,7 +36,7 @@ Config.Shops = {
         ['showBlip'] = true,                                         -- true or false
         ['blipSprite'] = 326,                                        -- Blip sprite
         ['blipColor'] = 3,                                           -- Blip color
-        ['TestDriveTimeLimit'] = 2.0,                                -- Time in minutes until the vehicle gets deleted
+        ['TestDriveTimeLimit'] = 0.5,                                -- Time in minutes until the vehicle gets deleted
         ['Location'] = vector3(-45.67, -1098.34, 26.42),             -- Blip Location
         ['ReturnLocation'] = vector3(-44.74, -1082.58, 26.68),       -- Location to return vehicle, only enables if the vehicleshop has a job owned
         ['VehicleSpawn'] = vector4(-56.79, -1109.85, 26.43, 71.5),   -- Spawn location when vehicle is bought
@@ -82,11 +82,6 @@ Config.Shops = {
                 coords = vector4(-44.28, -1102.47, 25.44, 298.5),
                 defaultVehicle = 'bati',
                 chosenVehicle = 'bati'
-            },
-            [9] = {
-                coords = vector4(-44.28, -1102.47, 25.44, 298.5),
-                defaultVehicle = '25cb1000',
-                chosenVehicle = '25cb1000'
             }
         },
     },
@@ -150,31 +145,6 @@ Config.Shops = {
                 defaultVehicle = 'hexer',
                 chosenVehicle = 'hexer'
             },
-            [7] = {
-                coords = vector4(-1249.21, -362.97, 35.91, 53.24),
-                defaultVehicle = 'g63trg',
-                chosenVehicle = 'g63trg'
-            },
-            [8] = {
-                coords = vector4(-1249.21, -362.97, 35.91, 53.24),
-                defaultVehicle = 'indiana',
-                chosenVehicle = 'indiana'
-            },
-            [9] = {
-                coords = vector4(-1249.21, -362.97, 35.91, 53.24),
-                defaultVehicle = '488',
-                chosenVehicle = '488'
-            },
-            [10] = {
-                coords = vector4(-1249.21, -362.97, 35.91, 53.24),
-                defaultVehicle = '21z900',
-                chosenVehicle = '21z900'
-            },
-            [11] = {
-                coords = vector4(-1249.21, -362.97, 35.91, 53.24),
-                defaultVehicle = 'tw_p918s15',
-                chosenVehicle = 'tw_p918s15'
-            },
         }
     },                         -- Add your next table under this comma
     ['boats'] = {
@@ -186,8 +156,8 @@ Config.Shops = {
                 vector2(-754.21, -1371.49),
                 vector2(-716.94, -1326.88)
             },
-            ['minZ'] = -5.0,                                            -- min height of the shop zone
-            ['maxZ'] = 15.0,                                            -- max height of the shop zone
+            ['minZ'] = 0.0,                                            -- min height of the shop zone
+            ['maxZ'] = 5.0,                                            -- max height of the shop zone
             ['size'] = 6.2                                             -- size of the vehicles zones
         },
         ['Job'] = 'none',                                              -- Name of job or none
@@ -233,8 +203,8 @@ Config.Shops = {
                 vector2(-1703.49, -3158.02),
                 vector2(-1646.03, -3190.84)
             },
-            ['minZ'] = 10.0,                                            -- min height of the shop zone
-            ['maxZ'] = 20.0,                                            -- max height of the shop zone
+            ['minZ'] = 12.99,                                            -- min height of the shop zone
+            ['maxZ'] = 16.99,                                            -- max height of the shop zone
             ['size'] = 7.0,                                              -- size of the vehicles zones
         },
         ['Job'] = 'none',                                                -- Name of job or none
@@ -321,11 +291,6 @@ Config.Shops = {
                 coords = vector4(896.95, -1162.62, 24.98, 273.08),
                 defaultVehicle = 'mixer',
                 chosenVehicle = 'mixer'
-            },
-            [5] = {
-                coords = vector4(896.95, -1162.62, 24.98, 273.08),
-                defaultVehicle = 'v8truck',
-                chosenVehicle = 'v8truck'
             },
         },
     },

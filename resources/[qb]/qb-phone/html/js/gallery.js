@@ -1,12 +1,11 @@
-﻿function setUpGalleryData(Images){
+function setUpGalleryData(Images){
     $(".gallery-images").html("");
-    if (Images != null && Images.length > 0) {
+    if (Images != null) {
         $.each(Images, function(i, image){
-            if (image && image.image && image.citizenid) {
-                var Element = '<div class="gallery-image"><img src="'+image.image+'" alt="'+image.citizenid+'" class="tumbnail"></div>';
-                $(".gallery-images").append(Element);
-                $("#image-"+i).data('ImageData', image);
-            }
+            var Element = '<div class="gallery-image"><img src="'+image.image+'" alt="'+image.citizenid+'" class="tumbnail"></div>';
+            
+            $(".gallery-images").append(Element);
+            $("#image-"+i).data('ImageData', image);
         });
     }
 }
@@ -124,7 +123,7 @@ $(document).on('click', '#tweet-button', function(e){
         // QB.Phone.Animations.TopSlideUp(".twitter-new-tweet-tab", 450, -120);
         returnDetail()
     } else {
-        QB.Phone.Notifications.Add("fab fa-twitter", "Twitter", "Preenche a mensagem!", "#1DA1F2");
+        QB.Phone.Notifications.Add("fab fa-twitter", "Twitter", "Fill a message!", "#1DA1F2");
     };
     $('#tweet-new-url').val("");
     $("#tweet-new-message").val("");
@@ -158,8 +157,7 @@ $(document).on('click', '#advert-button', function(e){
         }
         $("#new-textarea").val(' ');
     } else {
-        QB.Phone.Notifications.Add("fas fa-ad", "Anúncio", "Não podes publicar um anúncio vazio!", "#ff8f1a", 2000);
+        QB.Phone.Notifications.Add("fas fa-ad", "Advertisement", "You can\'t post an empty ad!", "#ff8f1a", 2000);
     }
 });
-
 

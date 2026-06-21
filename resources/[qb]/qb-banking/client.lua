@@ -1,4 +1,4 @@
-local QBCore = exports['qb-core']:GetCoreObject()
+local QBCore = exports['qb-core']:GetCoreObject({ 'Functions' })
 local zones = {}
 
 local isPlayerInsideBankZone = false
@@ -207,12 +207,11 @@ if not Config.useTarget then
                 exports['qb-core']:DrawText('Open Bank')
                 CreateThread(function()
                     while isPlayerInsideBankZone do
-                        Wait(50)
+                        Wait(0)
                         if IsControlJustPressed(0, 38) then
                             OpenBank()
                         end
                     end
-                    exports['qb-core']:HideText()
                 end)
             else
                 exports['qb-core']:HideText()

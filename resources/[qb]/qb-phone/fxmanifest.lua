@@ -3,33 +3,21 @@ game 'gta5'
 lua54 'yes'
 author 'Kakarot'
 description 'Allows players to access a phone to interact with various apps and features'
-version '1.3.0'
-
-
-dependencies {
-    'pma-voice',
-    'qb-banking',
-    'qb-core',
-    'qb-lapraces',
-    'screenshot-basic',
-}
-
-ui_page 'html/index.html'
+version '1.5.0'
 
 shared_scripts {
     'config.lua',
     '@qb-apartments/config.lua'
 }
 
-client_scripts {
-    'client/main.lua',
-    'client/animation.lua'
-}
+client_script 'client.lua'
 
 server_scripts {
     '@oxmysql/lib/MySQL.lua',
-    'server/main.lua'
+    'server.lua'
 }
+
+ui_page 'html/index.html'
 
 files {
     'html/*.html',

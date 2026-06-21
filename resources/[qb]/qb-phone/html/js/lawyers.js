@@ -1,4 +1,4 @@
-﻿SetupLawyers = function(data) {
+SetupLawyers = function(data) {
     $(".lawyers-list").html("");
     var lawyers = [];
     var realestate = [];
@@ -30,7 +30,7 @@
             }
         });
 
-        $(".lawyers-list").append('<h1 style="font-size:1.641025641025641vh; padding:1.0256410256410255vh; color:#fff; margin-top:0; border-top-left-radius: .5vh; border-top-right-radius: .5vh; width:100%; display:block; background-color: rgb(42, 137, 214);">Advogados (' + lawyers.length + ')</h1>');
+        $(".lawyers-list").append('<h1 style="font-size:1.641025641025641vh; padding:1.0256410256410255vh; color:#fff; margin-top:0; border-top-left-radius: .5vh; border-top-right-radius: .5vh; width:100%; display:block; background-color: rgb(42, 137, 214);">Lawyers (' + lawyers.length + ')</h1>');
 
         if (lawyers.length > 0) {
             $.each(lawyers, function(i, lawyer) {
@@ -39,11 +39,11 @@
                 $("#lawyerid-" + i).data('LawyerData', lawyer);
             });
         } else {
-            var element = '<div class="lawyer-list"><div class="no-lawyers">Não há advogados disponíveis.</div></div>'
+            var element = '<div class="lawyer-list"><div class="no-lawyers">There are no lawyers available.</div></div>'
             $(".lawyers-list").append(element);
         }
 
-        $(".lawyers-list").append('<br><h1 style="font-size:1.641025641025641vh; padding:1.0256410256410255vh; color:#fff; margin-top:0; width:100%; display:block; background-color: rgb(155, 15, 120);">Imobiliária (' + realestate.length + ')</h1>');
+        $(".lawyers-list").append('<br><h1 style="font-size:1.641025641025641vh; padding:1.0256410256410255vh; color:#fff; margin-top:0; width:100%; display:block; background-color: rgb(155, 15, 120);">Real Estate (' + realestate.length + ')</h1>');
 
         if (realestate.length > 0) {
             $.each(realestate, function(i, lawyer1) {
@@ -52,11 +52,11 @@
                 $("#lawyerid1-" + i).data('LawyerData', lawyer1);
             });
         } else {
-            var element = '<div class="lawyer-list"><div class="no-lawyers">Não há agentes imobiliários disponíveis.</div></div>'
+            var element = '<div class="lawyer-list"><div class="no-lawyers">There are no real estate agents available.</div></div>'
             $(".lawyers-list").append(element);
         }
 
-        $(".lawyers-list").append('<br><h1 style="font-size:1.641025641025641vh; padding:1.0256410256410255vh; color:#fff; margin-top:0; width:100%; display:block; background-color: rgb(0, 204, 102);">Mecânicos (' + mechanic.length + ')</h1>');
+        $(".lawyers-list").append('<br><h1 style="font-size:1.641025641025641vh; padding:1.0256410256410255vh; color:#fff; margin-top:0; width:100%; display:block; background-color: rgb(0, 204, 102);">Mechanic (' + mechanic.length + ')</h1>');
 
         if (mechanic.length > 0) {
             $.each(mechanic, function(i, lawyer2) {
@@ -65,11 +65,11 @@
                 $("#lawyerid2-" + i).data('LawyerData', lawyer2);
             });
         } else {
-            var element = '<div class="lawyer-list"><div class="no-lawyers">Não há mecânicos disponíveis.</div></div>'
+            var element = '<div class="lawyer-list"><div class="no-lawyers">There are no mechanics available.</div></div>'
             $(".lawyers-list").append(element);
         }
 
-        $(".lawyers-list").append('<br><h1 style="font-size:1.641025641025641vh; padding:1.0256410256410255vh; color:#fff; margin-top:0; width:100%; display:block; background-color: rgb(255, 190, 27);">Táxi (' + taxi.length + ')</h1>');
+        $(".lawyers-list").append('<br><h1 style="font-size:1.641025641025641vh; padding:1.0256410256410255vh; color:#fff; margin-top:0; width:100%; display:block; background-color: rgb(255, 190, 27);">Taxi (' + taxi.length + ')</h1>');
 
         if (taxi.length > 0) {
             $.each(taxi, function(i, lawyer3) {
@@ -78,11 +78,11 @@
                 $("#lawyerid3-" + i).data('LawyerData', lawyer3);
             });
         } else {
-            var element = '<div class="lawyer-list"><div class="no-lawyers">Não há táxis disponíveis.</div></div>'
+            var element = '<div class="lawyer-list"><div class="no-lawyers">There are no taxis available.</div></div>'
             $(".lawyers-list").append(element);
         }
         
-        $(".lawyers-list").append('<br><h1 style="font-size:1.641025641025641vh; padding:1.0256410256410255vh; color:#fff; margin-top:0; width:100%; display:block; background-color: rgb(0, 102, 255);">Polícia (' + police.length + ')</h1>');
+        $(".lawyers-list").append('<br><h1 style="font-size:1.641025641025641vh; padding:1.0256410256410255vh; color:#fff; margin-top:0; width:100%; display:block; background-color: rgb(0, 102, 255);">Police (' + police.length + ')</h1>');
 
         if (police.length > 0) {
             $.each(police, function(i, lawyer4) {
@@ -91,11 +91,11 @@
                 $("#lawyerid4-" + i).data('LawyerData', lawyer4);
             });
         } else {
-            var element = '<div class="lawyer-list"><div class="no-lawyers">Não há polícia disponível.</div></div>'
+            var element = '<div class="lawyer-list"><div class="no-lawyers">There is no police available.</div></div>'
             $(".lawyers-list").append(element);
         }
         
-        $(".lawyers-list").append('<br><h1 style="font-size:1.641025641025641vh; padding:1.0256410256410255vh; color:#fff; margin-top:0; width:100%; display:block; background-color: rgb(255, 0, 0);">INEM (' + ambulance.length + ')</h1>');
+        $(".lawyers-list").append('<br><h1 style="font-size:1.641025641025641vh; padding:1.0256410256410255vh; color:#fff; margin-top:0; width:100%; display:block; background-color: rgb(255, 0, 0);">Ambulance (' + ambulance.length + ')</h1>');
 
         if (ambulance.length > 0) {
             $.each(ambulance, function(i, lawyer5) {
@@ -104,38 +104,38 @@
                 $("#lawyerid5-" + i).data('LawyerData', lawyer5);
             });
         } else {
-            var element = '<div class="lawyer-list"><div class="no-lawyers">Não há INEM disponível.</div></div>'
+            var element = '<div class="lawyer-list"><div class="no-lawyers">There is no ems available.</div></div>'
             $(".lawyers-list").append(element);
         }
     } else {
-        $(".lawyers-list").append('<h1 style="font-size:1.641025641025641vh; padding:1.0256410256410255vh; color:#fff; margin-top:0; border-top-left-radius: .5vh; border-top-right-radius: .5vh; width:100%; display:block; background-color: rgb(42, 137, 214);">Advogados (' + lawyers.length + ')</h1>');
+        $(".lawyers-list").append('<h1 style="font-size:1.641025641025641vh; padding:1.0256410256410255vh; color:#fff; margin-top:0; border-top-left-radius: .5vh; border-top-right-radius: .5vh; width:100%; display:block; background-color: rgb(42, 137, 214);">Lawyers (' + lawyers.length + ')</h1>');
 
-        var element = '<div class="lawyer-list"><div class="no-lawyers">Não há advogados disponíveis.</div></div>'
+        var element = '<div class="lawyer-list"><div class="no-lawyers">There are no lawyers available.</div></div>'
         $(".lawyers-list").append(element);
 
-        $(".lawyers-list").append('<br><h1 style="font-size:1.641025641025641vh; padding:1.0256410256410255vh; color:#fff; margin-top:0; width:100%; display:block; background-color: rgb(155, 15, 120);">Imobiliária (' + realestate.length + ')</h1>');
+        $(".lawyers-list").append('<br><h1 style="font-size:1.641025641025641vh; padding:1.0256410256410255vh; color:#fff; margin-top:0; width:100%; display:block; background-color: rgb(155, 15, 120);">Real Estate (' + realestate.length + ')</h1>');
 
-        var element = '<div class="lawyer-list"><div class="no-lawyers">Não há agentes imobiliários disponíveis.</div></div>'
+        var element = '<div class="lawyer-list"><div class="no-lawyers">There are no real estate agents available.</div></div>'
         $(".lawyers-list").append(element);
 
-        $(".lawyers-list").append('<br><h1 style="font-size:1.641025641025641vh; padding:1.0256410256410255vh; color:#fff; margin-top:0; width:100%; display:block; background-color: rgb(0, 204, 102);">Mecânicos (' + mechanic.length + ')</h1>');
+        $(".lawyers-list").append('<br><h1 style="font-size:1.641025641025641vh; padding:1.0256410256410255vh; color:#fff; margin-top:0; width:100%; display:block; background-color: rgb(0, 204, 102);">Mechanic (' + mechanic.length + ')</h1>');
 
-        var element = '<div class="lawyer-list"><div class="no-lawyers">Não há mecânicos disponíveis.</div></div>'
+        var element = '<div class="lawyer-list"><div class="no-lawyers">There are no mechanics available.</div></div>'
         $(".lawyers-list").append(element);
 
-        $(".lawyers-list").append('<br><h1 style="font-size:1.641025641025641vh; padding:1.0256410256410255vh; color:#fff; margin-top:0; width:100%; display:block; background-color: rgb(255, 190, 27);">Táxi (' + taxi.length + ')</h1>');
+        $(".lawyers-list").append('<br><h1 style="font-size:1.641025641025641vh; padding:1.0256410256410255vh; color:#fff; margin-top:0; width:100%; display:block; background-color: rgb(255, 190, 27);">Taxi (' + taxi.length + ')</h1>');
 
-        var element = '<div class="lawyer-list"><div class="no-lawyers">Não há táxis disponíveis.</div></div>'
-        $(".lawyers-list").append(element);
-        
-        $(".lawyers-list").append('<br><h1 style="font-size:1.641025641025641vh; padding:1.0256410256410255vh; color:#fff; margin-top:0; width:100%; display:block; background-color: rgb(0, 102, 255);">Polícia (' + police.length + ')</h1>');
-
-        var element = '<div class="lawyer-list"><div class="no-lawyers">Não há polícia disponível.</div></div>'
+        var element = '<div class="lawyer-list"><div class="no-lawyers">There are no taxis available.</div></div>'
         $(".lawyers-list").append(element);
         
-        $(".lawyers-list").append('<br><h1 style="font-size:1.641025641025641vh; padding:1.0256410256410255vh; color:#fff; margin-top:0; width:100%; display:block; background-color: rgb(255, 0, 0);">INEM (' + ambulance.length + ')</h1>');
+        $(".lawyers-list").append('<br><h1 style="font-size:1.641025641025641vh; padding:1.0256410256410255vh; color:#fff; margin-top:0; width:100%; display:block; background-color: rgb(0, 102, 255);">Police (' + police.length + ')</h1>');
 
-        var element = '<div class="lawyer-list"><div class="no-lawyers">Não há INEM disponível.</div></div>'
+        var element = '<div class="lawyer-list"><div class="no-lawyers">There are no polices a available.</div></div>'
+        $(".lawyers-list").append(element);
+        
+        $(".lawyers-list").append('<br><h1 style="font-size:1.641025641025641vh; padding:1.0256410256410255vh; color:#fff; margin-top:0; width:100%; display:block; background-color: rgb(255, 0, 0);">Ambulance (' + ambulance.length + ')</h1>');
+
+        var element = '<div class="lawyer-list"><div class="no-lawyers">There are no ambulance personnel a available.</div></div>'
         $(".lawyers-list").append(element);
     }
 }
@@ -159,7 +159,7 @@ $(document).on('click', '.lawyer-list-call', function(e){
                 if (status.CanCall) {
                     if (!status.InCall) {
                         if (QB.Phone.Data.AnonymousCall) {
-                            QB.Phone.Notifications.Add("fas fa-phone", "Phone", "Iniciaste uma chamada anónima!");
+                            QB.Phone.Notifications.Add("fas fa-phone", "Phone", "You started a anonymous call!");
                         }
                         $(".phone-call-outgoing").css({"display":"block"});
                         $(".phone-call-incoming").css({"display":"none"});
@@ -178,18 +178,16 @@ $(document).on('click', '.lawyer-list-call', function(e){
                     
                         QB.Phone.Data.currentApplication = "phone-call";
                     } else {
-                        QB.Phone.Notifications.Add("fas fa-phone", "Phone", "Já estás ligado a uma chamada!");
+                        QB.Phone.Notifications.Add("fas fa-phone", "Phone", "You are already connected to a call!");
                     }
                 } else {
-                    QB.Phone.Notifications.Add("fas fa-phone", "Phone", "Esta pessoa já está numa chamada");
+                    QB.Phone.Notifications.Add("fas fa-phone", "Phone", "This person is already in a call");
                 }
             } else {
-                QB.Phone.Notifications.Add("fas fa-phone", "Phone", "Esta pessoa não está disponível!");
+                QB.Phone.Notifications.Add("fas fa-phone", "Phone", "This person is not available!");
             }
         } else {
-            QB.Phone.Notifications.Add("fas fa-phone", "Phone", "Não podes ligar para o teu próprio número!");
+            QB.Phone.Notifications.Add("fas fa-phone", "Phone", "You can't call your own number!");
         }
     });
 });
-
-

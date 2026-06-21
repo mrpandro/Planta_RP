@@ -124,13 +124,20 @@ end)
 -- Functions
 
 function checkWeapon(source, item)
-    local currentWeapon = type(item) == 'table' and item.name or item
+    local currentWeapon = item
     local ped = GetPlayerPed(source)
     local weapon = GetSelectedPedWeapon(ped)
     local weaponInfo = QBCore.Shared.Weapons[weapon]
+    local info = {}
+
+    if type(item) == 'table' then
+        currentWeapon = item.name
+        info = item.info or {}
+    end
+
     if weaponInfo and weaponInfo.name == currentWeapon then
         RemoveWeaponFromPed(ped, weapon)
-        TriggerClientEvent('qb-weapons:client:UseWeapon', source, { name = currentWeapon }, false)
+        TriggerClientEvent('qb-weapons:client:UseWeapon', source, { name = currentWeapon, info = info }, false)
     end
 end
 
@@ -188,10 +195,13 @@ RegisterNetEvent('qb-inventory:server:useItem', function(item)
     elseif itemData.name == 'id_card' then
         UseItem(itemData.name, src, itemData)
         TriggerClientEvent('qb-inventory:client:ItemBox', source, itemInfo, 'use')
+        local Player = QBCore.Functions.GetPlayer(src)
+        if not Player then return end
+        local charinfo = Player.PlayerData.charinfo
         local playerPed = GetPlayerPed(src)
         local playerCoords = GetEntityCoords(playerPed)
         local players = QBCore.Functions.GetPlayers()
-        local gender = item.info.gender == 0 and 'Male' or 'Female'
+        local gender = charinfo.gender == 0 and 'Male' or 'Female'
         for _, v in pairs(players) do
             local targetPed = GetPlayerPed(v)
             local dist = #(playerCoords - GetEntityCoords(targetPed))
@@ -200,12 +210,12 @@ RegisterNetEvent('qb-inventory:server:useItem', function(item)
                     template = '<div class="chat-message advert" style="background: linear-gradient(to right, rgba(5, 5, 5, 0.6), #74807c); display: flex;"><div style="margin-right: 10px;"><i class="far fa-id-card" style="height: 100%;"></i><strong> {0}</strong><br> <strong>Civ ID:</strong> {1} <br><strong>First Name:</strong> {2} <br><strong>Last Name:</strong> {3} <br><strong>Birthdate:</strong> {4} <br><strong>Gender:</strong> {5} <br><strong>Nationality:</strong> {6}</div></div>',
                     args = {
                         'ID Card',
-                        item.info.citizenid,
-                        item.info.firstname,
-                        item.info.lastname,
-                        item.info.birthdate,
+                        Player.PlayerData.citizenid,
+                        charinfo.firstname,
+                        charinfo.lastname,
+                        charinfo.birthdate,
                         gender,
-                        item.info.nationality
+                        charinfo.nationality
                     }
                 })
             end
@@ -213,6 +223,9 @@ RegisterNetEvent('qb-inventory:server:useItem', function(item)
     elseif itemData.name == 'driver_license' then
         UseItem(itemData.name, src, itemData)
         TriggerClientEvent('qb-inventory:client:ItemBox', src, itemInfo, 'use')
+        local Player = QBCore.Functions.GetPlayer(src)
+        if not Player then return end
+        local charinfo = Player.PlayerData.charinfo
         local playerPed = GetPlayerPed(src)
         local playerCoords = GetEntityCoords(playerPed)
         local players = QBCore.Functions.GetPlayers()
@@ -224,10 +237,10 @@ RegisterNetEvent('qb-inventory:server:useItem', function(item)
                     template = '<div class="chat-message advert" style="background: linear-gradient(to right, rgba(5, 5, 5, 0.6), #657175); display: flex;"><div style="margin-right: 10px;"><i class="far fa-id-card" style="height: 100%;"></i><strong> {0}</strong><br> <strong>First Name:</strong> {1} <br><strong>Last Name:</strong> {2} <br><strong>Birth Date:</strong> {3} <br><strong>Licenses:</strong> {4}</div></div>',
                     args = {
                         'Drivers License',
-                        item.info.firstname,
-                        item.info.lastname,
-                        item.info.birthdate,
-                        item.info.type
+                        charinfo.firstname,
+                        charinfo.lastname,
+                        charinfo.birthdate,
+                        itemData.info and itemData.info.type or 'DRIVE'
                     }
                 }
                 )
@@ -358,13 +371,13 @@ QBCore.Functions.CreateCallback('qb-inventory:server:attemptPurchase', function(
     end
 
     if amount > shopInfo.items[itemInfo.slot].amount or shopInfo.items[itemInfo.slot].amount <= 0 then
-        TriggerClientEvent('QBCore:Notify', source, 'Cannot purchase larger quantity than currently in stock', 'error')
+        TriggerClientEvent('QBCore:Notify', source, Lang:t('notify.notenoughstock'), 'error')
         cb(false)
         return
     end
 
     if not CanAddItem(source, itemInfo.name, amount) then
-        TriggerClientEvent('QBCore:Notify', source, 'Cannot hold item', 'error')
+        TriggerClientEvent('QBCore:Notify', source, Lang:t('notify.canthold'), 'error')
         cb(false)
         return
     end
@@ -377,7 +390,7 @@ QBCore.Functions.CreateCallback('qb-inventory:server:attemptPurchase', function(
         TriggerEvent('qb-shops:server:UpdateShopItems', shop, itemInfo, amount)
         cb(true)
     else
-        TriggerClientEvent('QBCore:Notify', source, 'You do not have enough money', 'error')
+        TriggerClientEvent('QBCore:Notify', source, Lang:t('notify.notencash'), 'error')
         cb(false)
     end
 end)

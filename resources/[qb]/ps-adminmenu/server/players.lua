@@ -65,9 +65,13 @@ RegisterNetEvent('ps-adminmenu:server:SetJob', function(data, selectedData)
     local src = source
     local playerId, Job, Grade = selectedData["Player"].value, selectedData["Job"].value, selectedData["Grade"].value
     local Player = QBCore.Functions.GetPlayer(playerId)
+    if not Player then
+        QBCore.Functions.Notify(src, locale("not_online"), 'error', 5000)
+        return
+    end
     local name = Player.PlayerData.charinfo.firstname .. ' ' .. Player.PlayerData.charinfo.lastname
     local jobInfo = QBCore.Shared.Jobs[Job]
-    local grade = jobInfo["grades"][selectedData["Grade"].value]
+    local grade = jobInfo and jobInfo["grades"] and jobInfo["grades"][selectedData["Grade"].value]
 
     if not jobInfo then
         TriggerClientEvent('QBCore:Notify', source, "Not a valid job", 'error')
@@ -94,9 +98,13 @@ RegisterNetEvent('ps-adminmenu:server:SetGang', function(data, selectedData)
     local src = source
     local playerId, Gang, Grade = selectedData["Player"].value, selectedData["Gang"].value, selectedData["Grade"].value
     local Player = QBCore.Functions.GetPlayer(playerId)
+    if not Player then
+        QBCore.Functions.Notify(src, locale("not_online"), 'error', 5000)
+        return
+    end
     local name = Player.PlayerData.charinfo.firstname .. ' ' .. Player.PlayerData.charinfo.lastname
     local GangInfo = QBCore.Shared.Gangs[Gang]
-    local grade = GangInfo["grades"][selectedData["Grade"].value]
+    local grade = GangInfo and GangInfo["grades"] and GangInfo["grades"][selectedData["Grade"].value]
 
     if not GangInfo then
         TriggerClientEvent('QBCore:Notify', source, "Not a valid Gang", 'error')

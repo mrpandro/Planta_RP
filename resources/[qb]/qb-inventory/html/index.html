@@ -27,10 +27,6 @@
                                 <p>{{ (playerWeight / 1000).toFixed(1) }} / {{ (maxWeight / 1000).toFixed(1) }}</p>
                             </div>
                         </div>
-                        <div class="inventory-meta">
-                            <p>{{ playerUsedSlots }} / {{ totalSlots }} slots</p>
-                            <p>Shift + Click para dividir</p>
-                        </div>
                         <div class="weight-bar">
                             <div class="weight-bar-fill" :style="{ width: Math.min((playerWeight / maxWeight) * 100, 100) + '%' }" :class="weightBarClass"></div>
                         </div>
@@ -70,16 +66,10 @@
 
                 <div class="input-container" v-if="!isOtherInventoryEmpty">
                     <div class="input-wrapper">
-                        <input type="number" v-model.number="transferAmount" min="1" :placeholder="transferAmount === null ? 'quant.' : ''" />
+                        <input type="number" v-model="transferAmount" min="1" :placeholder="transferAmount === null ? 'amount' : ''" />
                         <button @click="clearTransferAmount" class="clear-button">
                             <i class="fas fa-times"></i>
                         </button>
-                    </div>
-                    <div class="amount-presets">
-                        <button class="preset-btn" @click="setTransferAmountPreset(1)">1</button>
-                        <button class="preset-btn" @click="setTransferAmountPreset(5)">5</button>
-                        <button class="preset-btn" @click="setTransferAmountPreset(10)">10</button>
-                        <button class="preset-btn preset-all" @click="setTransferAmountPreset('all')">Tudo</button>
                     </div>
                 </div>
 
@@ -93,10 +83,6 @@
                             <div class="current-weight">
                                 <p>{{ (otherInventoryWeight / 1000).toFixed(1) }} / {{(otherInventoryMaxWeight / 1000).toFixed(1) }}</p>
                             </div>
-                        </div>
-                        <div class="inventory-meta">
-                            <p>{{ otherUsedSlots }} / {{ otherInventorySlots }} slots</p>
-                            <p>Click direito: mover rapido</p>
                         </div>
                         <div class="weight-bar">
                             <div class="weight-bar-fill" :style="{ width: Math.min((otherInventoryWeight / otherInventoryMaxWeight) * 100, 100) + '%' }" :class="otherWeightBarClass"></div>
@@ -134,12 +120,6 @@
                         </div>
                     </div>
                 </div>
-            </div>
-            <div class="inventory-help" v-if="isInventoryOpen">
-                <div class="help-chip"><kbd>LMB</kbd> Arrastar / Soltar</div>
-                <div class="help-chip"><kbd>RMB</kbd> Mover rapido / Menu</div>
-                <div class="help-chip"><kbd>Shift</kbd> Dividir stack</div>
-                <div class="help-chip"><kbd>Esc</kbd> Fechar</div>
             </div>
             <div class="hotbar-container" v-if="showHotbar">
                 <div class="hotbar">

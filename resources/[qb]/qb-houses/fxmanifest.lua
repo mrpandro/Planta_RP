@@ -3,7 +3,7 @@ game 'gta5'
 lua54 'yes'
 author 'Kakarot'
 description 'Housing system for players using shells and furniture items to decorate their homes'
-version '2.2.0'
+version '1.5.0'
 
 ui_page 'html/index.html'
 
@@ -24,7 +24,7 @@ client_scripts {
 
 server_scripts {
     '@oxmysql/lib/MySQL.lua',
-    'server/main.lua'
+    'server.lua'
 }
 
 files {
@@ -38,11 +38,6 @@ files {
 dependencies {
     'qb-core',
     'qb-interior',
+    'qb-clothing',
     'qb-weathersync'
-,
-    'qb-banking',
-    'qb-inventory',
-    'qb-menu',
-    'qb-minigames',
-    'qb-target',
 }

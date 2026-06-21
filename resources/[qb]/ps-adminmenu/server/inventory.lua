@@ -56,16 +56,25 @@ end)
 
 -- Open Inv [ox side]
 RegisterNetEvent('ps-adminmenu:server:OpenInv', function(data)
+    if not QBCore.Functions.HasPermission(source, 'qbcore.mod') then
+        return QBCore.Functions.Notify(source, locale("no_perms"), 'error')
+    end
     exports.ox_inventory:forceOpenInventory(source, 'player', data)
 end)
 
 -- Open Stash [ox side]
 RegisterNetEvent('ps-adminmenu:server:OpenStash', function(data)
+    if not QBCore.Functions.HasPermission(source, 'qbcore.mod') then
+        return QBCore.Functions.Notify(source, locale("no_perms"), 'error')
+    end
     exports.ox_inventory:forceOpenInventory(source, 'stash', data)
 end)
 
 -- Open Trunk [ox side]
 RegisterNetEvent('ps-adminmenu:server:OpenTrunk', function(data)
+    if not QBCore.Functions.HasPermission(source, 'qbcore.mod') then
+        return QBCore.Functions.Notify(source, locale("no_perms"), 'error')
+    end
     exports.ox_inventory:forceOpenInventory(source, 'trunk', data)
 end)
 
@@ -79,7 +88,13 @@ RegisterNetEvent('ps-adminmenu:server:GiveItem', function(data, selectedData)
     local amount = selectedData["Amount"].value
     local Player = QBCore.Functions.GetPlayer(target)
 
-    if not item or not amount then return end
+    amount = tonumber(amount)
+    if not item or not amount or amount <= 0 or amount > 1000 then
+        return QBCore.Functions.Notify(source, locale("invalid_amount"), 'error', 7500)
+    end
+    if not QBCore.Shared.Items[item] then
+        return QBCore.Functions.Notify(source, locale("invalid_item"), 'error', 7500)
+    end
     if not Player then
         return QBCore.Functions.Notify(source, locale("not_online"), 'error', 7500)
     end
@@ -99,11 +114,19 @@ RegisterNetEvent('ps-adminmenu:server:GiveItemAll', function(data, selectedData)
     local amount = selectedData["Amount"].value
     local players = QBCore.Functions.GetPlayers()
 
-    if not item or not amount then return end
+    amount = tonumber(amount)
+    if not item or not amount or amount <= 0 or amount > 1000 then
+        return QBCore.Functions.Notify(source, locale("invalid_amount"), 'error', 7500)
+    end
+    if not QBCore.Shared.Items[item] then
+        return QBCore.Functions.Notify(source, locale("invalid_item"), 'error', 7500)
+    end
 
     for _, id in pairs(players) do
         local Player = QBCore.Functions.GetPlayer(id)
-        Player.Functions.AddItem(item, amount)
-        QBCore.Functions.Notify(source, locale("give_item_all", amount .. " " .. item), "success", 7500)
+        if Player then
+            Player.Functions.AddItem(item, amount)
+        end
     end
+    QBCore.Functions.Notify(source, locale("give_item_all", amount .. " " .. item), "success", 7500)
 end)

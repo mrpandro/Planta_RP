@@ -2,7 +2,7 @@
 
 QBCore.Commands.Add('giveitem', 'Give An Item (Admin Only)', { { name = 'id', help = 'Player ID' }, { name = 'item', help = 'Name of the item (not a label)' }, { name = 'amount', help = 'Amount of items' } }, false, function(source, args)
     local id = tonumber(args[1])
-    local player = QBCore.Functions.GetPlayer(id)
+    local player = exports['qb-core']:GetPlayer(id)
     local amount = tonumber(args[3]) or 1
     local itemData = QBCore.Shared.Items[tostring(args[2]):lower()]
     if player then
@@ -49,7 +49,7 @@ QBCore.Commands.Add('giveitem', 'Give An Item (Admin Only)', { { name = 'id', he
 end, 'admin')
 
 QBCore.Commands.Add('randomitems', 'Receive random items', {}, false, function(source)
-    local player = QBCore.Functions.GetPlayer(source)
+    local player = exports['qb-core']:GetPlayer(source)
     local playerInventory = player.PlayerData.items
     local filteredItems = {}
     for k, v in pairs(QBCore.Shared.Items) do
@@ -73,7 +73,7 @@ QBCore.Commands.Add('randomitems', 'Receive random items', {}, false, function(s
         if emptySlot then
             if AddItem(source, randitem.name, amount, emptySlot, false, 'random items command') then
                 TriggerClientEvent('qb-inventory:client:ItemBox', source, QBCore.Shared.Items[randitem.name], 'add')
-                player = QBCore.Functions.GetPlayer(source)
+                player = exports['qb-core']:GetPlayer(source)
                 playerInventory = player.PlayerData.items
                 if Player(source).state.inv_busy then TriggerClientEvent('qb-inventory:client:updateInventory', source) end
             end
@@ -99,7 +99,7 @@ end, false)
 
 RegisterCommand('hotbar', function(source)
     if Player(source).state.inv_busy then return end
-    local QBPlayer = QBCore.Functions.GetPlayer(source)
+    local QBPlayer = exports['qb-core']:GetPlayer(source)
     if not QBPlayer then return end
     if not QBPlayer or QBPlayer.PlayerData.metadata['isdead'] or QBPlayer.PlayerData.metadata['inlaststand'] or QBPlayer.PlayerData.metadata['ishandcuffed'] then return end
     local hotbarItems = {
@@ -114,7 +114,7 @@ end, false)
 
 RegisterCommand('inventory', function(source)
     if Player(source).state.inv_busy then return end
-    local QBPlayer = QBCore.Functions.GetPlayer(source)
+    local QBPlayer = exports['qb-core']:GetPlayer(source)
     if not QBPlayer then return end
     if not QBPlayer or QBPlayer.PlayerData.metadata['isdead'] or QBPlayer.PlayerData.metadata['inlaststand'] or QBPlayer.PlayerData.metadata['ishandcuffed'] then return end
     QBCore.Functions.TriggerClientCallback('qb-inventory:client:vehicleCheck', source, function(inventory, class)

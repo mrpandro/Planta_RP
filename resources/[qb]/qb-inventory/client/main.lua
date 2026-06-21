@@ -19,7 +19,9 @@ RegisterNetEvent('QBCore:Client:UpdateObject', function()
     QBCore = exports['qb-core']:GetCoreObject()
 end)
 
-RegisterNetEvent('QBCore:Player:SetPlayerData', function(val)
+RegisterNetEvent('QBCore:Client:OnPlayerUpdated', function(key, val)
+    if key == 'items' then PlayerData.items = val return end
+    if key ~= 'all' then return end
     PlayerData = val
 end)
 
@@ -30,15 +32,6 @@ AddEventHandler('onResourceStart', function(resourceName)
 end)
 
 -- Functions
-
-function LoadAnimDict(dict)
-    if HasAnimDictLoaded(dict) then return end
-
-    RequestAnimDict(dict)
-    while not HasAnimDictLoaded(dict) do
-        Wait(10)
-    end
-end
 
 local function FormatWeaponAttachments(itemdata)
     if not itemdata.info or not itemdata.info.attachments or #itemdata.info.attachments == 0 then
@@ -52,7 +45,7 @@ local function FormatWeaponAttachments(itemdata)
         local componentHash = weapons[weaponName]
         if componentHash then
             for _, attachmentData in pairs(itemdata.info.attachments) do
-                if attachmentData.component == componentHash then
+                if attachmentData.component == componentHash or (type(attachmentData.component) == 'string' and GetHashKey(attachmentData.component) == componentHash) then
                     local label = QBCore.Shared.Items[attachmentType] and QBCore.Shared.Items[attachmentType].label or 'Unknown'
                     attachments[#attachments + 1] = {
                         attachment = attachmentType,
@@ -180,8 +173,9 @@ end)
 
 RegisterNetEvent('qb-inventory:client:giveAnim', function()
     if IsPedInAnyVehicle(PlayerPedId(), false) then return end
-    LoadAnimDict('mp_common')
-    TaskPlayAnim(PlayerPedId(), 'mp_common', 'givetake1_b', 8.0, 1.0, -1, 16, 0, false, false, false)
+    local animDict = 'mp_common'
+    QBCore.Functions.RequestAnimDict(animDict)
+    TaskPlayAnim(PlayerPedId(), animDict, 'givetake1_b', 8.0, 1.0, -1, 16, 0, false, false, false)
 end)
 
 -- NUI Callbacks
@@ -255,7 +249,7 @@ RegisterNUICallback('RemoveAttachment', function(data, cb)
             for _, v in pairs(NewAttachments) do
                 for attachmentType, weapons in pairs(allAttachments) do
                     local componentHash = weapons[WeaponData.name]
-                    if componentHash and v.component == componentHash then
+                    if componentHash and (v.component == componentHash or (type(v.component) == 'string' and GetHashKey(v.component) == componentHash)) then
                         local label = itemInfo and itemInfo.label or 'Unknown'
                         Attachies[#Attachies + 1] = {
                             attachment = attachmentType,
@@ -272,7 +266,7 @@ RegisterNUICallback('RemoveAttachment', function(data, cb)
             cb(DJATA)
         else
             RemoveWeaponComponentFromPed(ped, joaat(WeaponData.name), joaat(Attachment))
-            cb({})
+            cb({ WeaponData = WeaponData, itemInfo = itemInfo })
         end
     end, data.AttachmentData, WeaponData)
 end)

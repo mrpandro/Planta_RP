@@ -165,7 +165,16 @@ RegisterNetEvent('ps-adminmenu:server:GiveMoney', function(data, selectedData)
         return QBCore.Functions.Notify(src, locale("not_online"), 'error', 7500)
     end
 
-    Player.Functions.AddMoney(tostring(moneyType), tonumber(amount))
+    amount = tonumber(amount)
+    moneyType = tostring(moneyType)
+    if not amount or amount <= 0 or amount > 10000000 then
+        return QBCore.Functions.Notify(src, locale("invalid_amount"), 'error', 7500)
+    end
+    if not Player.PlayerData.money[moneyType] then
+        return QBCore.Functions.Notify(src, locale("invalid_money_type"), 'error', 7500)
+    end
+
+    Player.Functions.AddMoney(moneyType, amount)
     QBCore.Functions.Notify(src,
         locale((moneyType == "crypto" and "give_money_crypto" or "give_money"), tonumber(amount),
             Player.PlayerData.charinfo.firstname .. " " .. Player.PlayerData.charinfo.lastname), "success")
@@ -180,12 +189,20 @@ RegisterNetEvent('ps-adminmenu:server:GiveMoneyAll', function(data, selectedData
     local amount, moneyType = selectedData["Amount"].value, selectedData["Type"].value
     local players = QBCore.Functions.GetPlayers()
 
+    amount = tonumber(amount)
+    moneyType = tostring(moneyType)
+    if not amount or amount <= 0 or amount > 10000000 then
+        return QBCore.Functions.Notify(src, locale("invalid_amount"), 'error', 7500)
+    end
+
     for _, v in pairs(players) do
         local Player = QBCore.Functions.GetPlayer(tonumber(v))
-        Player.Functions.AddMoney(tostring(moneyType), tonumber(amount))
-        QBCore.Functions.Notify(src,
-            locale((moneyType == "crypto" and "give_money_all_crypto" or "give_money_all"), tonumber(amount)), "success")
+        if Player and Player.PlayerData.money[moneyType] then
+            Player.Functions.AddMoney(moneyType, amount)
+        end
     end
+    QBCore.Functions.Notify(src,
+        locale((moneyType == "crypto" and "give_money_all_crypto" or "give_money_all"), amount), "success")
 end)
 
 -- Take Money
@@ -202,10 +219,20 @@ RegisterNetEvent('ps-adminmenu:server:TakeMoney', function(data, selectedData)
         return QBCore.Functions.Notify(src, locale("not_online"), 'error', 7500)
     end
 
-    if Player.PlayerData.money[moneyType] >= tonumber(amount) then
-        Player.Functions.RemoveMoney(moneyType, tonumber(amount), "state-fees")
+    amount = tonumber(amount)
+    moneyType = tostring(moneyType)
+    if not amount or amount <= 0 or amount > 10000000 then
+        return QBCore.Functions.Notify(src, locale("invalid_amount"), 'error', 7500)
+    end
+    if not Player.PlayerData.money[moneyType] then
+        return QBCore.Functions.Notify(src, locale("invalid_money_type"), 'error', 7500)
+    end
+
+    if Player.PlayerData.money[moneyType] >= amount then
+        Player.Functions.RemoveMoney(moneyType, amount, "state-fees")
     else
         QBCore.Functions.Notify(src, locale("not_enough_money"), "primary")
+        return
     end
 
     QBCore.Functions.Notify(src,
