@@ -1,4 +1,4 @@
-local QBCore = exports['qb-core']:GetCoreObject()
+local QBCore = exports['qb-core']:GetCoreObject({ 'Functions' })
 local PlayerData = QBCore.Functions.GetPlayerData()
 local config = Config
 local speedMultiplier = config.UseMPH and 2.23694 or 3.6
@@ -103,7 +103,8 @@ RegisterNetEvent('QBCore:Client:OnPlayerUnload', function()
     PlayerData = {}
 end)
 
-RegisterNetEvent('QBCore:Player:SetPlayerData', function(val)
+RegisterNetEvent('QBCore:Client:OnPlayerUpdated', function(key, val)
+    if key ~= 'all' then return end
     PlayerData = val
 end)
 
@@ -137,18 +138,6 @@ RegisterNUICallback('closeMenu', function(_, cb)
 end)
 
 RegisterKeyMapping('menu', 'Open Menu', 'keyboard', config.OpenMenu)
-
-CreateThread(function()
-    while true do
-        Wait(0)
-        if LocalPlayer.state.isLoggedIn and not IsPauseMenuActive() then
-            local ped = PlayerPedId()
-            if IsPedArmed(ped, 4) and IsControlPressed(0, 25) then
-                DrawRect(0.5, 0.5, 0.0025, 0.0045, 255, 255, 255, 220)
-            end
-        end
-    end
-end)
 
 -- Reset hud
 local function restartHud()
@@ -778,7 +767,7 @@ CreateThread(function()
                 end
                 wasInVehicle = true
                 local engineHealth = GetVehicleEngineHealth(vehicle)
-                if not engineHealth or engineHealth ~= engineHealth then -- This checks for NaN, as any NaN value is not equal to itself
+                if engineHealth ~= engineHealth then -- This checks for NaN, as any NaN value is not equal to itself
                     engineHealth = 0
                 end
                 updatePlayerHud({
@@ -874,6 +863,7 @@ end)
 -- Money HUD
 
 local Round = math.floor
+local function RoundNearest(value) return math.floor(value + 0.5) end
 
 RegisterNetEvent('hud:client:ShowAccounts', function(type, amount)
     if type == 'cash' then
@@ -1115,9 +1105,9 @@ CreateThread(function()
         local player = PlayerPedId()
         local camRot = GetGameplayCamRot(0)
         if Menu.isCompassFollowChecked then
-            heading = tostring(QBCore.Shared.Round(360.0 - ((camRot.z + 360.0) % 360.0)))
+            heading = tostring(RoundNearest(360.0 - ((camRot.z + 360.0) % 360.0)))
         else
-            heading = tostring(QBCore.Shared.Round(360.0 - GetEntityHeading(player)))
+            heading = tostring(RoundNearest(360.0 - GetEntityHeading(player)))
         end
         if heading == '360' then heading = '0' end
         if heading ~= lastHeading then

@@ -1,9 +1,9 @@
 local Translations = {
     text = {
         weazle_overlay = "VTM overlay ~INPUT_PICKUP~ \nFilm Overlay: ~INPUT_INTERACTION_MENU~",
-        weazel_news_vehicles = "VTM nieuws voertuigen",
+        vehicle = "VTM nieuws voertuigen",
         close_menu = "⬅ Sluit menu",
-        weazel_news_helicopters = "VTM nieuws helikopters",
+        heli = "VTM nieuws helikopters",
         store_vehicle = "~g~E~w~ - Voertuig parkeren",
         vehicles = "~g~E~w~ - Voertuig",
         store_helicopters = "~g~E~w~ - Helikopter parkeren",

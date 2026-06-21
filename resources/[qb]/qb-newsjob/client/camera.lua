@@ -1,15 +1,15 @@
 local holdingCam = false
 local holdingMic = false
 local holdingBmic = false
-local camModel = "prop_v_cam_01"
-local camanimDict = "missfinale_c2mcs_1"
-local camanimName = "fin_c2_mcs_1_camman"
-local micModel = "p_ing_microphonel_01"
-local micanimDict = "missheistdocksprep1hold_cellphone"
-local micanimName = "hold_cellphone"
-local bmicModel = "prop_v_bmike_01"
-local bmicanimDict = "missfra1"
-local bmicanimName = "mcs2_crew_idle_m_boom"
+local camModel = 'prop_v_cam_01'
+local camanimDict = 'missfinale_c2mcs_1'
+local camanimName = 'fin_c2_mcs_1_camman'
+local micModel = 'p_ing_microphonel_01'
+local micanimDict = 'missheistdocksprep1hold_cellphone'
+local micanimName = 'hold_cellphone'
+local bmicModel = 'prop_v_bmike_01'
+local bmicanimDict = 'missfra1'
+local bmicanimName = 'mcs2_crew_idle_m_boom'
 local bmic_net = nil
 local mic_net = nil
 local cam_net = nil
@@ -63,7 +63,6 @@ end
 local function HandleZoom(cam)
 	local lPed = PlayerPedId()
 	if not (IsPedSittingInAnyVehicle(lPed)) then
-
 		if IsControlJustPressed(0, 241) then
 			fov = math.max(fov - zoomspeed, fov_min)
 		end
@@ -95,7 +94,7 @@ local function drawRct(x, y, width, height, r, g, b, a)
 end
 
 local function DisplayNotification(string)
-	SetTextComponentFormat("STRING")
+	SetTextComponentFormat('STRING')
 	AddTextComponentSubstringPlayerName(string)
 	DisplayHelpTextFromStringLabel(0, 0, 1, -1)
 end
@@ -104,7 +103,7 @@ end
 -- Toggling Cam --
 ---------------------------------------------------------------------------
 
-RegisterNetEvent("Cam:ToggleCam", function()
+RegisterNetEvent('Cam:ToggleCam', function()
 	if not holdingCam then
 		RequestModel(GetHashKey(camModel))
 		while not HasModelLoaded(GetHashKey(camModel)) do
@@ -124,7 +123,7 @@ RegisterNetEvent("Cam:ToggleCam", function()
 		TaskPlayAnim(GetPlayerPed(PlayerId()), camanimDict, camanimName, 1.0, -1, -1, 50, 0, 0, 0, 0)
 		cam_net = netid
 		holdingCam = true
-		DisplayNotification(Lang:t("text.weazle_overlay"))
+		DisplayNotification(Lang:t('text.weazle_overlay'))
 	else
 		ClearPedSecondaryTask(GetPlayerPed(PlayerId()))
 		DetachEntity(NetToObj(cam_net), 1, 1)
@@ -136,7 +135,7 @@ end)
 
 CreateThread(function()
 	while true do
-		if PlayerJob.name == "reporter" then
+		if PlayerJob.name == 'reporter' then
 			if holdingCam then
 				while not HasAnimDictLoaded(camanimDict) do
 					RequestAnimDict(camanimDict)
@@ -152,7 +151,7 @@ CreateThread(function()
 				DisableControlAction(0, 25, true) -- disable aim
 				DisableControlAction(0, 44, true) -- INPUT_COVER
 				DisableControlAction(0, 37, true) -- INPUT_SELECT_WEAPON
-				SetCurrentPedWeapon(PlayerPedId(), GetHashKey("WEAPON_UNARMED"), true)
+				SetCurrentPedWeapon(PlayerPedId(), GetHashKey('WEAPON_UNARMED'), true)
 				Wait(7)
 			else
 				Wait(100)
@@ -169,31 +168,31 @@ end)
 
 CreateThread(function()
 	while true do
-		if PlayerJob.name == "reporter" then
+		if PlayerJob.name == 'reporter' then
 			if holdingCam then
 				if IsControlJustReleased(1, 244) then
 					movcamera = true
-					SetTimecycleModifier("default")
+					SetTimecycleModifier('default')
 					SetTimecycleModifierStrength(0.3)
-					local scaleform = RequestScaleformMovie("security_camera")
+					local scaleform = RequestScaleformMovie('security_camera')
 					while not HasScaleformMovieLoaded(scaleform) do
 						Wait(10)
 					end
 
 					local lPed = PlayerPedId()
 					local vehicle = GetVehiclePedIsIn(lPed)
-					local cam1 = CreateCam("DEFAULT_SCRIPTED_FLY_CAMERA", true)
+					local cam1 = CreateCam('DEFAULT_SCRIPTED_FLY_CAMERA', true)
 
 					AttachCamToEntity(cam1, lPed, 0.0, 0.0, 1.0, true)
 					SetCamRot(cam1, 2.0, 1.0, GetEntityHeading(lPed))
 					SetCamFov(cam1, fov)
 					RenderScriptCams(true, false, 0, 1, 0)
-					PushScaleformMovieFunction(scaleform, "security_camera")
+					PushScaleformMovieFunction(scaleform, 'security_camera')
 					PopScaleformMovieFunctionVoid()
 
 					while movcamera and not IsEntityDead(lPed) and (GetVehiclePedIsIn(lPed) == vehicle) and true do
 						if IsControlJustPressed(0, 177) then
-							PlaySoundFrontend(-1, "SELECT", "HUD_FRONTEND_DEFAULT_SOUNDSET", false)
+							PlaySoundFrontend(-1, 'SELECT', 'HUD_FRONTEND_DEFAULT_SOUNDSET', false)
 							movcamera = false
 						end
 
@@ -219,8 +218,8 @@ CreateThread(function()
 							camHeading = 180.0
 						end
 						camHeading = (camHeading + 180.0) / 360.0
-						SetTaskMoveNetworkSignalFloat(PlayerPedId(), "Pitch", camPitch)
-						SetTaskMoveNetworkSignalFloat(PlayerPedId(), "Heading", camHeading * -1.0 + 1.0)
+						SetTaskMoveNetworkSignalFloat(PlayerPedId(), 'Pitch', camPitch)
+						SetTaskMoveNetworkSignalFloat(PlayerPedId(), 'Heading', camHeading * -1.0 + 1.0)
 						Wait(1)
 					end
 					movcamera = false
@@ -248,14 +247,14 @@ end)
 
 CreateThread(function()
 	while true do
-		if PlayerJob.name == "reporter" then
+		if PlayerJob.name == 'reporter' then
 			if holdingCam then
 				if IsControlJustReleased(1, 38) then
 					newscamera = true
-					SetTimecycleModifier("default")
+					SetTimecycleModifier('default')
 					SetTimecycleModifierStrength(0.3)
-					local scaleform = RequestScaleformMovie("security_camera")
-					local scaleform2 = RequestScaleformMovie("breaking_news")
+					local scaleform = RequestScaleformMovie('security_camera')
+					local scaleform2 = RequestScaleformMovie('breaking_news')
 					while not HasScaleformMovieLoaded(scaleform) do
 						Wait(10)
 					end
@@ -264,17 +263,17 @@ CreateThread(function()
 					end
 					local lPed = PlayerPedId()
 					local vehicle = GetVehiclePedIsIn(lPed)
-					local cam2 = CreateCam("DEFAULT_SCRIPTED_FLY_CAMERA", true)
-					local msg = Lang:t("text.breaking_news")
-					local title = Lang:t("text.title_breaking_news")
-					local bottom = Lang:t("text.bottom_breaking_news")
+					local cam2 = CreateCam('DEFAULT_SCRIPTED_FLY_CAMERA', true)
+					local msg = Lang:t('text.breaking_news')
+					local title = Lang:t('text.title_breaking_news')
+					local bottom = Lang:t('text.bottom_breaking_news')
 
 					AttachCamToEntity(cam2, lPed, 0.0, 0.0, 1.0, true)
 					SetCamRot(cam2, 2.0, 1.0, GetEntityHeading(lPed))
 					SetCamFov(cam2, fov)
 					RenderScriptCams(true, false, 0, 1, 0)
-					PushScaleformMovieFunction(scaleform, "SET_CAM_LOGO")
-					PushScaleformMovieFunction(scaleform2, "breaking_news")
+					PushScaleformMovieFunction(scaleform, 'SET_CAM_LOGO')
+					PushScaleformMovieFunction(scaleform2, 'breaking_news')
 					PopScaleformMovieFunctionVoid()
 
 					BeginScaleformMovieMethod(scaleform2, 'SET_TEXT')
@@ -296,7 +295,7 @@ CreateThread(function()
 					EndScaleformMovieMethod()
 					while newscamera and not IsEntityDead(lPed) and (GetVehiclePedIsIn(lPed) == vehicle) and true do
 						if IsControlJustPressed(1, 177) then
-							PlaySoundFrontend(-1, "SELECT", "HUD_FRONTEND_DEFAULT_SOUNDSET", false)
+							PlaySoundFrontend(-1, 'SELECT', 'HUD_FRONTEND_DEFAULT_SOUNDSET', false)
 							newscamera = false
 						end
 						SetEntityRotation(lPed, 0, 0, new_z, 2, true)
@@ -321,8 +320,8 @@ CreateThread(function()
 							camHeading = 180.0
 						end
 						camHeading = (camHeading + 180.0) / 360.0
-						SetTaskMoveNetworkSignalFloat(PlayerPedId(), "Pitch", camPitch)
-						SetTaskMoveNetworkSignalFloat(PlayerPedId(), "Heading", camHeading * -1.0 + 1.0)
+						SetTaskMoveNetworkSignalFloat(PlayerPedId(), 'Pitch', camPitch)
+						SetTaskMoveNetworkSignalFloat(PlayerPedId(), 'Heading', camHeading * -1.0 + 1.0)
 						Wait(1)
 					end
 					newscamera = false
@@ -348,7 +347,7 @@ end)
 --B Mic --
 ---------------------------------------------------------------------------
 
-RegisterNetEvent("Mic:ToggleBMic", function()
+RegisterNetEvent('Mic:ToggleBMic', function()
 	if not holdingBmic then
 		RequestModel(GetHashKey(bmicModel))
 		while not HasModelLoaded(GetHashKey(bmicModel)) do
@@ -378,7 +377,7 @@ end)
 
 CreateThread(function()
 	while true do
-		if PlayerJob.name == "reporter" then
+		if PlayerJob.name == 'reporter' then
 			if holdingBmic then
 				while not HasAnimDictLoaded(bmicanimDict) do
 					RequestAnimDict(bmicanimDict)
@@ -392,8 +391,8 @@ CreateThread(function()
 				DisableControlAction(0, 25, true) -- disable aim
 				DisableControlAction(0, 44, true) -- INPUT_COVER
 				DisableControlAction(0, 37, true) -- INPUT_SELECT_WEAPON
-				SetCurrentPedWeapon(PlayerPedId(), GetHashKey("WEAPON_UNARMED"), true)
-				if IsPedInAnyVehicle(PlayerPedId(), false) or QBCore.Functions.GetPlayerData().metadata["ishandcuffed"] or holdingMic then
+				SetCurrentPedWeapon(PlayerPedId(), GetHashKey('WEAPON_UNARMED'), true)
+				if IsPedInAnyVehicle(PlayerPedId(), false) or QBCore.Functions.GetPlayerData().metadata['ishandcuffed'] or holdingMic then
 					ClearPedSecondaryTask(PlayerPedId())
 					DetachEntity(NetToObj(bmic_net), 1, 1)
 					DeleteEntity(NetToObj(bmic_net))
@@ -422,7 +421,7 @@ end)
 ---------------------------------------------------------------------------
 -- Toggling Mic --
 ---------------------------------------------------------------------------
-RegisterNetEvent("Mic:ToggleMic", function()
+RegisterNetEvent('Mic:ToggleMic', function()
 	if not holdingMic then
 		RequestModel(GetHashKey(micModel))
 		while not HasModelLoaded(GetHashKey(micModel)) do

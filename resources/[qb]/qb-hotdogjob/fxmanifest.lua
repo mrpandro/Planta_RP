@@ -3,14 +3,7 @@ game 'gta5'
 lua54 'yes'
 author 'Kakarot'
 description 'Allows players to sell hotdogs to npcs for money'
-version '1.2.2'
-
-
-dependencies {
-    'qb-core',
-    'qb-minigames',
-    'qb-target',
-}
+version '1.5.0'
 
 ui_page 'html/ui.html'
 
@@ -25,10 +18,10 @@ client_scripts {
     '@PolyZone/client.lua',
     '@PolyZone/BoxZone.lua',
     '@PolyZone/EntityZone.lua',
-    'client/main.lua'
+    'client.lua'
 }
 
-server_script 'server/main.lua'
+server_script 'server.lua'
 
 files {
     'html/ui.html',

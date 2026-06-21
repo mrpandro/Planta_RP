@@ -146,17 +146,14 @@ end)
 
 RegisterNetEvent('qb-weapons:client:DrawWeapon', function()
     if GetResourceState('qb-inventory') == 'missing' then return end
-    CreateThread(function()
-        local sleep
-        local weaponCheck = 0
-        local threadTimeout = 0
-        while threadTimeout < 300 do
-            local ped = PlayerPedId()
-            if not DoesEntityExist(ped) then break end
-            sleep = 250
-            if DoesEntityExist(ped) and not IsEntityDead(ped) and not IsPedInParachuteFreeFall(ped) and not IsPedFalling(ped) and (GetPedParachuteState(ped) == -1 or GetPedParachuteState(ped) == 0) then
-                sleep = 50
-                if currWeap ~= GetSelectedPedWeapon(ped) then
+    local sleep
+    local weaponCheck = 0
+    while true do
+        local ped = PlayerPedId()
+        sleep = 250
+        if DoesEntityExist(ped) and not IsEntityDead(ped) and not IsPedInParachuteFreeFall(ped) and not IsPedFalling(ped) and (GetPedParachuteState(ped) == -1 or GetPedParachuteState(ped) == 0) then
+            sleep = 0
+            if currWeap ~= GetSelectedPedWeapon(ped) then
                 local pos = GetEntityCoords(ped, true)
                 local rot = GetEntityHeading(ped)
 
@@ -319,16 +316,14 @@ RegisterNetEvent('qb-weapons:client:DrawWeapon', function()
                 end
             end
         end
-            Wait(sleep)
-            threadTimeout = threadTimeout + 1
-            if currWeap == nil or currWeap == `WEAPON_UNARMED` then
-                weaponCheck += 1
-                if weaponCheck == 2 then
-                    break
-                end
+        Wait(sleep)
+        if currWeap == nil or currWeap == `WEAPON_UNARMED` then
+            weaponCheck += 1
+            if weaponCheck == 2 then
+                break
             end
         end
-    end)
+    end
 end)
 
 function CeaseFire()
@@ -337,7 +332,7 @@ function CeaseFire()
         while not canFire do
             DisableControlAction(0, 25, true)
             DisablePlayerFiring(PlayerId(), true)
-            Wait(50)
+            Wait(0)
         end
     end)
 end

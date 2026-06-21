@@ -56,25 +56,16 @@ end)
 
 -- Open Inv [ox side]
 RegisterNetEvent('ps-adminmenu:server:OpenInv', function(data)
-    if not QBCore.Functions.HasPermission(source, 'qbcore.mod') then
-        return QBCore.Functions.Notify(source, locale("no_perms"), 'error')
-    end
     exports.ox_inventory:forceOpenInventory(source, 'player', data)
 end)
 
 -- Open Stash [ox side]
 RegisterNetEvent('ps-adminmenu:server:OpenStash', function(data)
-    if not QBCore.Functions.HasPermission(source, 'qbcore.mod') then
-        return QBCore.Functions.Notify(source, locale("no_perms"), 'error')
-    end
     exports.ox_inventory:forceOpenInventory(source, 'stash', data)
 end)
 
 -- Open Trunk [ox side]
 RegisterNetEvent('ps-adminmenu:server:OpenTrunk', function(data)
-    if not QBCore.Functions.HasPermission(source, 'qbcore.mod') then
-        return QBCore.Functions.Notify(source, locale("no_perms"), 'error')
-    end
     exports.ox_inventory:forceOpenInventory(source, 'trunk', data)
 end)
 
@@ -85,23 +76,22 @@ RegisterNetEvent('ps-adminmenu:server:GiveItem', function(data, selectedData)
 
     local target = selectedData["Player"].value
     local item = selectedData["Item"].value
-    local amount = selectedData["Amount"].value
+    local amount = tonumber(selectedData["Amount"].value)
     local Player = QBCore.Functions.GetPlayer(target)
 
-    amount = tonumber(amount)
-    if not item or not amount or amount <= 0 or amount > 1000 then
-        return QBCore.Functions.Notify(source, locale("invalid_amount"), 'error', 7500)
-    end
-    if not QBCore.Shared.Items[item] then
-        return QBCore.Functions.Notify(source, locale("invalid_item"), 'error', 7500)
-    end
+    if not item or not amount or amount <= 0 then return end
     if not Player then
         return QBCore.Functions.Notify(source, locale("not_online"), 'error', 7500)
     end
 
-    Player.Functions.AddItem(item, amount)
+    if Config.Inventory == "ox_inventory" then
+        exports.ox_inventory:AddItem(target, item, amount)
+    elseif Config.Inventory == "qb-inventory" then
+        Player.Functions.AddItem(item, amount)
+    end
+
     QBCore.Functions.Notify(source,
-        locale("give_item", tonumber(amount) .. " " .. item,
+        locale("give_item", amount .. " " .. item,
             Player.PlayerData.charinfo.firstname .. " " .. Player.PlayerData.charinfo.lastname), "success", 7500)
 end)
 
@@ -111,22 +101,21 @@ RegisterNetEvent('ps-adminmenu:server:GiveItemAll', function(data, selectedData)
     if not data or not CheckPerms(source, data.perms) then return end
 
     local item = selectedData["Item"].value
-    local amount = selectedData["Amount"].value
+    local amount = tonumber(selectedData["Amount"].value)
     local players = QBCore.Functions.GetPlayers()
 
-    amount = tonumber(amount)
-    if not item or not amount or amount <= 0 or amount > 1000 then
-        return QBCore.Functions.Notify(source, locale("invalid_amount"), 'error', 7500)
-    end
-    if not QBCore.Shared.Items[item] then
-        return QBCore.Functions.Notify(source, locale("invalid_item"), 'error', 7500)
-    end
+    if not item or not amount or amount <= 0 then return end
 
     for _, id in pairs(players) do
-        local Player = QBCore.Functions.GetPlayer(id)
-        if Player then
-            Player.Functions.AddItem(item, amount)
+        if Config.Inventory == "ox_inventory" then
+            exports.ox_inventory:AddItem(id, item, amount)
+        elseif Config.Inventory == "qb-inventory" then
+            local Player = QBCore.Functions.GetPlayer(id)
+            if Player then
+                Player.Functions.AddItem(item, amount)
+            end
         end
     end
+
     QBCore.Functions.Notify(source, locale("give_item_all", amount .. " " .. item), "success", 7500)
 end)

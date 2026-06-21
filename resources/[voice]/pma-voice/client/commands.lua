@@ -81,3 +81,27 @@ end, false)
 if gameVersion == 'fivem' then
 	RegisterKeyMapping('cycleproximity', 'Cycle Proximity', 'keyboard', GetConvar('voice_defaultCycle', 'F11'))
 end
+
+-- hacky workaround to the fact that you can't bind secondary key mappings to PTT
+if gameVersion == 'fivem' then
+	local isSecondaryPttPressed = false
+
+	RegisterCommand("+secondary_ptt", function()
+		isSecondaryPttPressed = true
+		CreateThread(function()
+			while isSecondaryPttPressed do
+				SetControlNormal(0, 249, 1.0)
+				SetControlNormal(1, 249, 1.0)
+				SetControlNormal(2, 249, 1.0)
+
+				Wait(0)
+			end
+		end)
+	end)
+
+	RegisterCommand("-secondary_ptt", function()
+		isSecondaryPttPressed = false
+	end)
+
+	RegisterKeyMapping('+secondary_ptt', 'A keybind that lets you have a secondary PTT', 'PAD_ANALOGBUTTOn', GetConvar('voice_defaultSecondary', 'LUP_INDEX'))
+end

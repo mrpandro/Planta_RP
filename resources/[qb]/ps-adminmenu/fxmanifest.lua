@@ -4,14 +4,6 @@ game "gta5"
 
 author "Project Sloth & OK1ez"
 version '1.1.7'
-
-dependencies {
-  'pma-voice',
-  'qb-core',
-  'qb-phone',
-  'qb-weathersync',
-}
-
 description 'Admin Menu'
 repository 'https://github.com/Project-Sloth/ps-adminmenu'
 

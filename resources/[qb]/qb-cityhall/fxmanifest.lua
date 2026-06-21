@@ -6,15 +6,6 @@ author 'Kakarot'
 description 'Allows players to purchase id cards and licenses or change their job'
 version '2.2.0'
 
-
-dependencies {
-    'qb-core',
-    'qb-inventory',
-    'qb-menu',
-    'qb-phone',
-    'qb-target',
-}
-
 shared_scripts {
     '@qb-core/shared/locale.lua',
     'locales/en.lua',
@@ -22,10 +13,10 @@ shared_scripts {
     'config.lua'
 }
 
-server_script 'server/main.lua'
+server_script 'server.lua'
 
 client_scripts {
     '@PolyZone/client.lua',
     '@PolyZone/BoxZone.lua',
-    'client/main.lua'
+    'client.lua'
 }

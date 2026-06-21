@@ -25,8 +25,6 @@ local function TooFarAway()
     availableDrugs = {}
 end
 
--- Fixed:
--- swapped the condition to `random <= Config.PoliceCallChance` so "Config.PoliceCallChance", represents the call probability.
 local function PoliceCall()
     local random = math.random(1, 100)
     if random <= Config.PoliceCallChance then
@@ -54,7 +52,7 @@ local function RobberyPed()
                         Wait(2000)
                         ClearPedTasks(player)
                         TriggerServerEvent('qb-drugs:server:giveStealItems', stealData.item, stealData.amount)
-                        TriggerEvent('qb-inventory:client:ItemBox', QBCore.Shared.Items[stealData.item], 'add')
+                        TriggerEvent('qb-inventory:client:ItemBox', sharedItems[stealData.item], 'add')
                         stealingPed = nil
                         stealData = {}
                         exports['qb-target']:RemoveZone('stealingPed')
@@ -106,7 +104,7 @@ local function RobberyPed()
                             Wait(2000)
                             ClearPedTasks(playerPed)
                             TriggerServerEvent('qb-drugs:server:giveStealItems', stealData.item, stealData.amount)
-                            TriggerEvent('qb-inventory:client:ItemBox', QBCore.Shared.Items[stealData.item], 'add')
+                            TriggerEvent('qb-inventory:client:ItemBox', sharedItems[stealData.item], 'add')
                             stealingPed = nil
                             stealData = {}
                         end

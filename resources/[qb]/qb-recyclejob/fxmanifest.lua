@@ -5,14 +5,6 @@ author 'Kakarot'
 description 'Allows players to work in the recycling plant for money'
 version '2.2.0'
 
-
-dependencies {
-  'qb-core',
-  'qb-input',
-  'qb-menu',
-  'qb-target',
-}
-
 shared_scripts {
   '@qb-core/shared/locale.lua',
   'locales/en.lua',
@@ -21,10 +13,10 @@ shared_scripts {
 }
 
 client_script {
-  'client/main.lua',
+  'client.lua',
   '@PolyZone/client.lua',
   '@PolyZone/BoxZone.lua',
   '@PolyZone/CircleZone.lua'
 }
 
-server_script 'server/main.lua'
+server_script 'server.lua'

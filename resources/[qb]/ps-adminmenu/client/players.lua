@@ -144,23 +144,17 @@ end
 
 -- Toggle Blips and Names events
 RegisterNetEvent('ps-adminmenu:client:toggleBlips', function(data)
-    local data = CheckDataFromKey(data)
-    if not data or not CheckPerms(data.perms) then return end
     if not ShowBlips then preparePlayers() end
     ToggleBlipsAndNames(true)
 end)
 
 RegisterNetEvent('ps-adminmenu:client:toggleNames', function(data)
-    local data = CheckDataFromKey(data)
-    if not data or not CheckPerms(data.perms) then return end
     if not ShowNames then preparePlayers() end
     ToggleBlipsAndNames(false)
 end)
 
 -- Mute Player
 RegisterNetEvent("ps-adminmenu:client:MutePlayer", function(data, selectedData)
-    local data = CheckDataFromKey(data)
-    if not data or not CheckPerms(data.perms) then return end
     local playerId = selectedData["Player"].value
     if not playerId then return end
     exports["pma-voice"]:toggleMutePlayer(playerId)

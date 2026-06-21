@@ -1,25 +1,32 @@
+local sharedVehicles = exports['qb-core']:GetShared('Vehicles')
 PlayerData = {}
 
--- Handlers (Inicialização)
+-- Handlers
 
 AddEventHandler('OnResourceStart', function(resourceName)
     if (GetCurrentResourceName() ~= resourceName) then return end
     PlayerData = QBCore.Functions.GetPlayerData()
 end)
 
-AddEventHandler('QBCore:Client:OnPlayerLoaded', function()
+RegisterNetEvent('QBCore:Client:OnPlayerLoaded', function()
     PlayerData = QBCore.Functions.GetPlayerData()
 end)
 
-RegisterNetEvent('QBCore:Client:OnJobUpdate', function(JobInfo)
-    PlayerData.job = JobInfo
+RegisterNetEvent('QBCore:Client:OnPlayerUpdated', function(key, val)
+    if key == 'job' then
+        local JobInfo = val
+        PlayerData.job = JobInfo
+    elseif key == 'all' then
+        local JobInfo = val.job
+        PlayerData.job = JobInfo
+    end
 end)
 
 RegisterNetEvent('QBCore:Client:OnPlayerUnload', function()
     PlayerData = {}
 end)
 
--- Global Functions (Funções Auxiliares)
+-- Global Functions
 
 function Trim(plate)
     return (string.gsub(plate, '^%s*(.-)%s*$', '%1'))
@@ -61,12 +68,12 @@ function GetClosestWheel(vehicle)
     return closestWheelIndex
 end
 
--- Local Functions (Garagens)
+-- Local Functions
 
 local function SpawnListVehicle(model, spawnPoint)
     QBCore.Functions.TriggerCallback('QBCore:Server:SpawnVehicle', function(netId)
         local veh = NetToVeh(netId)
-        SetVehicleNumberPlateText(veh, 'MEC' .. tostring(math.random(1000, 9999))) -- Mudei para MEC (Mecânico)
+        SetVehicleNumberPlateText(veh, 'MECH' .. tostring(math.random(1000, 9999)))
         SetEntityHeading(veh, spawnPoint.w)
         exports[Config.FuelResource]:SetFuel(veh, 100.0)
         TriggerEvent('vehiclekeys:client:SetOwner', QBCore.Functions.GetPlate(veh))
@@ -75,12 +82,12 @@ local function SpawnListVehicle(model, spawnPoint)
 end
 
 local function VehicleList(shop)
-    local vehicleMenu = { { header = 'Veículos de Serviço', isMenuHeader = true } }
+    local vehicleMenu = { { header = Lang:t('menu.vehicle_list'), isMenuHeader = true } }
     local list = Config.Shops[shop].vehicles.list
     for i = 1, #list do
         local v = list[i]
         vehicleMenu[#vehicleMenu + 1] = {
-            header = QBCore.Shared.Vehicles[v].name,
+            header = sharedVehicles[v].name,
             params = {
                 event = 'qb-mechanicjob:client:SpawnListVehicle',
                 args = {
@@ -91,7 +98,7 @@ local function VehicleList(shop)
         }
     end
     vehicleMenu[#vehicleMenu + 1] = {
-        header = 'Fechar Menu',
+        header = Lang:t('menu.close'),
         txt = '',
         params = {
             event = 'qb-menu:client:closeMenu'
@@ -109,13 +116,10 @@ RegisterNetEvent('qb-mechanicjob:client:SpawnListVehicle', function(data)
     SpawnListVehicle(vehicleSpawnName, spawnPoint)
 end)
 
--- Main Thread (Criação das Zonas e Blips)
+-- Main Thread
 
 CreateThread(function()
-    -- Loop pelas oficinas (Agora vai ler 'bennys' e 'tuners')
     for k, v in pairs(Config.Shops) do
-        
-        -- 1. Criação do Blip no Mapa
         if v.showBlip then
             local blip = AddBlipForCoord(v.blipCoords)
             SetBlipSprite(blip, v.blipSprite)
@@ -128,7 +132,6 @@ CreateThread(function()
             EndTextCommandSetBlipName(blip)
         end
 
-        -- 2. Zona de Entrar em Serviço (Duty)
         exports['qb-target']:AddCircleZone(k .. '_duty', v.duty, 0.5, {
             name = k .. '_duty',
             debugPoly = false,
@@ -137,21 +140,20 @@ CreateThread(function()
             options = { {
                 type = 'server',
                 event = 'QBCore:ToggleDuty',
-                label = 'Entrar/Sair de Serviço',
+                label = Lang:t('target.duty'),
                 icon = 'fas fa-user-clock',
-                job = v.managed and k or nil -- Verifica se é bennys ou tuners
+                job = v.managed and k or nil
             } },
             distance = 2.0
         })
 
-        -- 3. Zona do Baú (Stash)
         exports['qb-target']:AddCircleZone(k .. '_stash', v.stash, 0.5, {
             name = k .. '_stash',
             debugPoly = false,
             useZ = true
         }, {
             options = { {
-                label = 'Abrir Baú da Oficina',
+                label = Lang:t('target.stash'),
                 icon = 'fas fa-box-open',
                 job = v.managed and k or nil,
                 type = 'server',
@@ -160,24 +162,22 @@ CreateThread(function()
             distance = 2.0
         })
 
-        -- 4. Cabine de Pintura (Paintbooth)
         exports['qb-target']:AddCircleZone(k .. '_paintbooth', v.paint, 0.5, {
             name = k .. '_paintbooth',
             debugPoly = false,
             useZ = true
         }, {
             options = { {
-                label = 'Cabine de Pintura',
+                label = Lang:t('target.paint'),
                 icon = 'fas fa-fill-drip',
                 job = v.managed and k or nil,
                 action = function()
-                    PaintCategories()
+                    PaintCategories() -- cosmetics.lua
                 end
             } },
             distance = 2.0
         })
 
-        -- 5. Garagem (Spawner)
         exports['qb-target']:AddCircleZone(k .. '_spawner', v.vehicles.withdraw, 0.5, {
             name = k .. '_spawner',
             debugPoly = false,
@@ -185,7 +185,7 @@ CreateThread(function()
         }, {
             options = {
                 {
-                    label = 'Retirar Veículo',
+                    label = Lang:t('target.withdraw'),
                     icon = 'fas fa-car',
                     job = v.managed and k or nil,
                     canInteract = function()
@@ -198,7 +198,7 @@ CreateThread(function()
                     end
                 },
                 {
-                    label = 'Guardar Veículo',
+                    label = Lang:t('target.deposit'),
                     icon = 'fas fa-car',
                     job = k,
                     canInteract = function()

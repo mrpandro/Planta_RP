@@ -13,14 +13,8 @@ shared_scripts {
 }
 server_scripts {
     '@oxmysql/lib/MySQL.lua',
-    'server/main.lua'
+    'server.lua'
 }
-client_script 'client/main.lua'
+client_script 'client.lua'
 
 dependency 'qb-minigames'
-
-
-dependencies {
-    'qb-core',
-    'qb-inventory',
-}

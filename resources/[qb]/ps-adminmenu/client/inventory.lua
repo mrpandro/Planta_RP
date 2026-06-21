@@ -1,7 +1,5 @@
 -- Open Inventory
 RegisterNetEvent('ps-adminmenu:client:openInventory', function(data, selectedData)
-    local data = CheckDataFromKey(data)
-    if not data or not CheckPerms(data.perms) then return end
     local player = selectedData["Player"].value
 
     if Config.Inventory == 'ox_inventory' then
@@ -13,8 +11,6 @@ end)
 
 -- Open Stash
 RegisterNetEvent('ps-adminmenu:client:openStash', function(data, selectedData)
-    local data = CheckDataFromKey(data)
-    if not data or not CheckPerms(data.perms) then return end
     local stash = selectedData["Stash"].value
 
     if Config.Inventory == 'ox_inventory' then
@@ -27,8 +23,6 @@ end)
 
 -- Open Trunk
 RegisterNetEvent('ps-adminmenu:client:openTrunk', function(data, selectedData)
-    local data = CheckDataFromKey(data)
-    if not data or not CheckPerms(data.perms) then return end
     local vehiclePlate = selectedData["Plate"].value
 
     if Config.Inventory == 'ox_inventory' then

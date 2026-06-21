@@ -1,6 +1,12 @@
 -- Admin Car
-RegisterNetEvent('ps-adminmenu:server:SaveCar', function(mods, vehicle, _, plate)
+RegisterNetEvent('ps-adminmenu:server:SaveCar', function(data, mods, vehicle, _, plate)
     local src = source
+    
+    if not data or not CheckPerms(src, data.perms) then
+        QBCore.Functions.Notify(src, locale("no_perms"), "error", 5000)
+        return
+    end
+    
     local Player = QBCore.Functions.GetPlayer(src)
     local result = MySQL.query.await('SELECT plate FROM player_vehicles WHERE plate = ?', { plate })
 
@@ -116,6 +122,11 @@ RegisterNetEvent("ps-adminmenu:server:SetVehicleState", function(data, selectedD
 end)
 
 -- Change Plate
+local function tableExists(tableName)
+    local result = MySQL.query.await('SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?', { tableName })
+    return result and result[1] ~= nil
+end
+
 RegisterNetEvent('ps-adminmenu:server:ChangePlate', function(newPlate, currentPlate)
     local newPlate = newPlate:upper()
 
@@ -124,8 +135,12 @@ RegisterNetEvent('ps-adminmenu:server:ChangePlate', function(newPlate, currentPl
     end
 
     MySQL.Sync.execute('UPDATE player_vehicles SET plate = ? WHERE plate = ?', { newPlate, currentPlate })
-    MySQL.Sync.execute('UPDATE trunkitems SET plate = ? WHERE plate = ?', { newPlate, currentPlate })
-    MySQL.Sync.execute('UPDATE gloveboxitems SET plate = ? WHERE plate = ?', { newPlate, currentPlate })
+    if tableExists('trunkitems') then
+        MySQL.Sync.execute('UPDATE trunkitems SET plate = ? WHERE plate = ?', { newPlate, currentPlate })
+    end
+    if tableExists('gloveboxitems') then
+        MySQL.Sync.execute('UPDATE gloveboxitems SET plate = ? WHERE plate = ?', { newPlate, currentPlate })
+    end
 end)
 
 lib.callback.register('ps-adminmenu:server:GetVehicleByPlate', function(source, plate)

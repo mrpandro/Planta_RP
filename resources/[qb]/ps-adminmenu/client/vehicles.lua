@@ -8,9 +8,6 @@ end
 
 -- Own Vehicle
 RegisterNetEvent('ps-adminmenu:client:Admincar', function(data)
-    local data = CheckDataFromKey(data)
-    if not data or not CheckPerms(data.perms) then return end
-
     if not cache.vehicle then return end
 
     local props = lib.getVehicleProperties(cache.vehicle)
@@ -19,7 +16,7 @@ RegisterNetEvent('ps-adminmenu:client:Admincar', function(data)
     local hash = GetHashKey(cache.vehicle)
 
     if sharedVehicles then
-        TriggerServerEvent('ps-adminmenu:server:SaveCar', props, sharedVehicles, hash, props.plate)
+        TriggerServerEvent('ps-adminmenu:server:SaveCar', data, props, sharedVehicles, hash, props.plate)
     else
         QBCore.Functions.Notify(locale("cannot_store_veh"), 'error')
     end
@@ -27,16 +24,10 @@ end)
 
 -- Spawn Vehicle
 RegisterNetEvent('ps-adminmenu:client:SpawnVehicle', function(data, selectedData)
-    local data = CheckDataFromKey(data)
-    if not data or not CheckPerms(data.perms) then return end
-
     local selectedVehicle = selectedData["Vehicle"].value
     local hash = GetHashKey(selectedVehicle)
 
-    if not IsModelValid(hash) then
-        QBCore.Functions.Notify('Modelo não disponível: ' .. selectedVehicle, 'error', 5000)
-        return
-    end
+    if not IsModelValid(hash) then return end
 
     lib.requestModel(hash)
 
@@ -60,9 +51,6 @@ end)
 
 -- Refuel Vehicle
 RegisterNetEvent('ps-adminmenu:client:RefuelVehicle', function(data)
-    local data = CheckDataFromKey(data)
-    if not data or not CheckPerms(data.perms) then return end
-
     if cache.vehicle then
         if Config.Fuel == "ox_fuel" then
             Entity(cache.vehicle).state.fuel = 100.0
@@ -77,8 +65,6 @@ end)
 
 -- Change plate
 RegisterNetEvent('ps-adminmenu:client:ChangePlate', function(data, selectedData)
-    local data = CheckDataFromKey(data)
-    if not data or not CheckPerms(data.perms) then return end
     local plate = selectedData["Plate"].value
 
     if string.len(plate) > 8 then
@@ -132,8 +118,6 @@ local function UpdateVehicleMenu()
 end
 
 RegisterNetEvent('ps-adminmenu:client:ToggleVehDevMenu', function(data)
-    local data = CheckDataFromKey(data)
-    if not data or not CheckPerms(data.perms) then return end
     if not cache.vehicle then return end
 
     VEHICLE_DEV_MODE = not VEHICLE_DEV_MODE
@@ -160,9 +144,6 @@ end
 
 
 RegisterNetEvent('ps-adminmenu:client:maxmodVehicle', function(data)
-    local data = CheckDataFromKey(data)
-    if not data or not CheckPerms(data.perms) then return end
-
     if cache.vehicle then
         UpgradePerformance(cache.vehicle)
     else
@@ -173,9 +154,6 @@ end)
 -- Spawn Personal vehicles
 
 RegisterNetEvent("ps-adminmenu:client:SpawnPersonalVehicle", function(data, selectedData)
-    local data = CheckDataFromKey(data)
-    if not data or not CheckPerms(data.perms) then return end
-
     local plate = selectedData['VehiclePlate'].value
     local ped = PlayerPedId()
     local coords = QBCore.Functions.GetCoords(ped)

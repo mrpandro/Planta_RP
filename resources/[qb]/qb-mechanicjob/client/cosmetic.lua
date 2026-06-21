@@ -1,10 +1,8 @@
-QBCore = exports['qb-core']:GetCoreObject()
+QBCore = exports['qb-core']:GetCoreObject({ 'Functions' })
 local particleEffects = {}
 local isPainting = false
 
--- TRADUÇÃO E LÓGICA POR: BOSS ENGENHEIRO
-
--- Funções Auxiliares de Pintura
+-- Paint
 
 local function HexToRGB(hex)
     if type(hex) ~= 'string' or not hex:match('^#?[%x]+$') or (#hex ~= 6 and #hex ~= 7) then return end
@@ -29,7 +27,7 @@ end
 
 local function GetPaints(category)
     local Paints = {}
-    Paints[#Paints + 1] = { value = 'none', text = 'Nenhuma' }
+    Paints[#Paints + 1] = { value = 'none', text = Lang:t('menu.none') }
     for i = 1, #Config.Paints[category] do
         Paints[#Paints + 1] = {
             value = Config.Paints[category][i].id,
@@ -42,29 +40,29 @@ end
 local function PaintList(category)
     local paintOptions = GetPaints(category)
     local dialog = exports['qb-input']:ShowInput({
-        header = 'Pintura do Veículo',
-        submitText = 'Confirmar',
+        header = Lang:t('menu.paint_vehicle'),
+        submitText = Lang:t('menu.submit'),
         inputs = {
             {
-                text = 'Primária',
+                text = Lang:t('menu.primary'),
                 name = 'primarypaint',
                 type = 'select',
                 options = paintOptions
             },
             {
-                text = 'Secundária',
+                text = Lang:t('menu.secondary'),
                 name = 'secondarypaint',
                 type = 'select',
                 options = paintOptions
             },
             {
-                text = 'Perolada',
+                text = Lang:t('menu.pearlescent'),
                 name = 'pearlescentpaint',
                 type = 'select',
                 options = paintOptions
             },
             {
-                text = 'Rodas',
+                text = Lang:t('menu.wheels'),
                 name = 'wheelpaint',
                 type = 'select',
                 options = paintOptions
@@ -89,11 +87,11 @@ end
 
 local function CustomColor()
     local dialog = exports['qb-input']:ShowInput({
-        header = 'Cor Personalizada',
-        submitText = 'Confirmar',
+        header = Lang:t('menu.custom_color'),
+        submitText = Lang:t('menu.submit'),
         inputs = {
             {
-                text = 'HEX (Ex: #FF0000)',
+                text = 'HEX',
                 name = 'hex',
                 type = 'text',
                 isRequired = false
@@ -105,22 +103,22 @@ local function CustomColor()
                 isRequired = false
             },
             {
-                text = 'Secção',
+                text = Lang:t('menu.section'),
                 name = 'section',
                 type = 'radio',
                 options = {
-                    { value = 'primary',   text = 'Primária' },
-                    { value = 'secondary', text = 'Secundária' }
+                    { value = 'primary',   text = Lang:t('menu.primary') },
+                    { value = 'secondary', text = Lang:t('menu.secondary') }
                 }
             },
             {
-                text = 'Tipo',
+                text = Lang:t('menu.type'),
                 name = 'paintType',
                 type = 'radio',
                 options = {
-                    { value = 'metallic', text = 'Metálica' },
-                    { value = 'matte',    text = 'Matte (Fosco)' },
-                    { value = 'chrome',   text = 'Cromado' }
+                    { value = 'metallic', text = Lang:t('menu.metallic') },
+                    { value = 'matte',    text = Lang:t('menu.matte') },
+                    { value = 'chrome',   text = Lang:t('menu.chrome') }
                 }
             }
         }
@@ -137,9 +135,9 @@ local function CustomColor()
 end
 
 function PaintCategories()
-    local Paints = { { header = 'Categorias de Pintura', isMenuHeader = true, icon = 'fas fa-fill' } }
+    local Paints = { { header = Lang:t('menu.paints'), isMenuHeader = true, icon = 'fas fa-fill' } }
     Paints[#Paints + 1] = {
-        header = 'Cor Personalizada (HEX/RGB)',
+        header = Lang:t('menu.custom_color'),
         params = {
             isAction = true,
             event = function()
@@ -150,7 +148,7 @@ function PaintCategories()
     }
     for k in pairs(Config.Paints) do
         Paints[#Paints + 1] = {
-            header = k, -- Nome da categoria (Metallic, Matte, etc)
+            header = k,
             params = {
                 isAction = true,
                 event = function()
@@ -166,7 +164,7 @@ end
 -- Interior
 
 local function OpenInteriors(vehicle)
-    local mods = { { header = 'Interior', isMenuHeader = true, icon = 'fas fa-chair' } }
+    local mods = { { header = Lang:t('menu.interior'), isMenuHeader = true, icon = 'fas fa-car-side' } }
     for i = 1, #Config.InteriorCategories do
         local modCount = GetNumVehicleMods(vehicle, Config.InteriorCategories[i].id)
         if modCount > 0 then
@@ -186,9 +184,9 @@ local function OpenInteriors(vehicle)
 end
 
 function InteriorModList(id, vehicle, label)
-    local mods = { { header = label, isMenuHeader = true, icon = 'fas fa-chair' } }
+    local mods = { { header = label, isMenuHeader = true, icon = 'fas fa-car-side' } }
     mods[#mods + 1] = {
-        header = 'Voltar',
+        header = Lang:t('menu.back'),
         icon = 'fas fa-backward',
         params = {
             isAction = true,
@@ -201,7 +199,7 @@ function InteriorModList(id, vehicle, label)
     for i = 0, GetNumVehicleMods(vehicle, id) - 1 do
         local modHeader
         if id == 14 then
-            modHeader = Config.HornLabels[i] or 'Desconhecido'
+            modHeader = Config.HornLabels[i] or Lang:t('menu.unknown')
         else
             local modTextLabel = GetModTextLabel(vehicle, id, i)
             modHeader = modTextLabel and GetLabelText(modTextLabel) or 'Mod ' .. i
@@ -232,7 +230,7 @@ end
 -- Exterior
 
 local function OpenExteriors(vehicle)
-    local mods = { { header = 'Exterior', isMenuHeader = true, icon = 'fas fa-car-side' } }
+    local mods = { { header = Lang:t('menu.exterior'), isMenuHeader = true, icon = 'fas fa-car-side' } }
     for i = 1, #Config.ExteriorCategories do
         local modCount = GetNumVehicleMods(vehicle, Config.ExteriorCategories[i].id)
         if modCount > 0 then
@@ -254,7 +252,7 @@ end
 function ExteriorModList(id, vehicle, label)
     local mods = { { header = label, isMenuHeader = true, icon = 'fas fa-car-side' } }
     mods[#mods + 1] = {
-        header = 'Voltar',
+        header = Lang:t('menu.back'),
         icon = 'fas fa-backward',
         params = {
             isAction = true,
@@ -281,7 +279,7 @@ function ExteriorModList(id, vehicle, label)
     exports['qb-menu']:openMenu(mods)
 end
 
--- Tire Smoke (Fumo dos Pneus)
+-- Tire Smoke
 
 local function GetSmokeList()
     local smokes = {}
@@ -304,11 +302,11 @@ end
 
 local function TireSmoke(vehicle)
     local dialog = exports['qb-input']:ShowInput({
-        header = 'Fumo dos Pneus',
-        submitText = 'Confirmar',
+        header = Lang:t('menu.tire_smoke'),
+        submitText = Lang:t('menu.submit'),
         inputs = {
             {
-                text = 'HEX (Ex: #FF0000)',
+                text = 'HEX',
                 name = 'hex',
                 type = 'text',
                 isRequired = false
@@ -320,18 +318,18 @@ local function TireSmoke(vehicle)
                 isRequired = false
             },
             {
-                text = 'Cores Padrão',
+                text = Lang:t('menu.standard'),
                 name = 'color',
                 type = 'select',
                 options = GetSmokeList()
             },
             {
-                text = 'Opções',
+                text = Lang:t('menu.toggle'),
                 name = 'toggle',
                 type = 'radio',
                 options = {
-                    { value = 'togglehex',      text = 'Cor Personalizada' },
-                    { value = 'togglestandard', text = 'Cor Padrão' },
+                    { value = 'togglehex',      text = Lang:t('menu.custom') },
+                    { value = 'togglestandard', text = Lang:t('menu.standard') },
                 }
             }
         }
@@ -354,12 +352,12 @@ local function TireSmoke(vehicle)
     end
 end
 
--- Wheels (Rodas)
+-- Wheels
 
 local function OpenWheels(vehicle)
-    local mods = { { header = 'Rodas e Pneus', isMenuHeader = true, icon = 'fas fa-truck-monster' } }
+    local mods = { { header = Lang:t('menu.wheels'), isMenuHeader = true, icon = 'fas fa-truck-monster' } }
     mods[#mods + 1] = {
-        header = 'Fumo dos Pneus',
+        header = Lang:t('menu.tire_smoke'),
         icon = 'fas fa-smog',
         params = {
             isAction = true,
@@ -387,7 +385,7 @@ end
 function OpenWheelList(id, vehicle, label)
     local mods = { { header = label, isMenuHeader = true, icon = 'fas fa-truck-monster' } }
     mods[#mods + 1] = {
-        header = 'Voltar',
+        header = Lang:t('menu.back'),
         icon = 'fas fa-backward',
         params = {
             isAction = true,
@@ -438,49 +436,49 @@ end
 
 local function OpenNeon(vehicle)
     local dialog = exports['qb-input']:ShowInput({
-        header = 'Configuração de Neons',
-        submitText = 'Confirmar',
+        header = Lang:t('menu.neons'),
+        submitText = Lang:t('menu.submit'),
         inputs = {
             {
-                text = 'Cor',
+                text = Lang:t('menu.color'),
                 name = 'color',
                 type = 'select',
                 options = GetNeonList()
             },
             {
-                text = 'Frente',
+                text = Lang:t('menu.front_toggle'),
                 name = 'frontenable',
                 type = 'radio',
                 options = {
-                    { value = 'enable',  text = 'Ativado' },
-                    { value = 'disable', text = 'Desativado' },
+                    { value = 'enable',  text = Lang:t('menu.enabled') },
+                    { value = 'disable', text = Lang:t('menu.disabled') },
                 }
             },
             {
-                text = 'Trás',
+                text = Lang:t('menu.rear_toggle'),
                 name = 'rearenable',
                 type = 'radio',
                 options = {
-                    { value = 'enable',  text = 'Ativado' },
-                    { value = 'disable', text = 'Desativado' },
+                    { value = 'enable',  text = Lang:t('menu.enabled') },
+                    { value = 'disable', text = Lang:t('menu.disabled') },
                 }
             },
             {
-                text = 'Esquerda',
+                text = Lang:t('menu.left_toggle'),
                 name = 'leftenable',
                 type = 'radio',
                 options = {
-                    { value = 'enable',  text = 'Ativado' },
-                    { value = 'disable', text = 'Desativado' },
+                    { value = 'enable',  text = Lang:t('menu.enabled') },
+                    { value = 'disable', text = Lang:t('menu.disabled') },
                 }
             },
             {
-                text = 'Direita',
+                text = Lang:t('menu.right_toggle'),
                 name = 'rightenable',
                 type = 'radio',
                 options = {
-                    { value = 'enable',  text = 'Ativado' },
-                    { value = 'disable', text = 'Desativado' },
+                    { value = 'enable',  text = Lang:t('menu.enabled') },
+                    { value = 'disable', text = Lang:t('menu.disabled') },
                 }
             }
         }
@@ -514,7 +512,7 @@ local function OpenNeon(vehicle)
     SetVehicleNeonLightsColour(vehicle, GetNeonColors(dialog.color))
 end
 
--- Headlights (Xénon)
+-- Headlights
 
 local function GetXenonList()
     local xenons = {}
@@ -529,57 +527,69 @@ end
 
 local function OpenXenon(vehicle)
     local dialog = exports['qb-input']:ShowInput({
-        header = 'Luzes Xénon',
-        submitText = 'Confirmar',
+        header = Lang:t('menu.xenon'),
+        submitText = Lang:t('menu.submit'),
         inputs = {
             {
-                text = 'Estado',
-                name = 'toggle',
-                type = 'radio',
-                options = {
-                    { value = 'enable',  text = 'Instalar (Branco Padrão)' },
-                    { value = 'disable', text = 'Remover' },
-                    { value = 'custom',  text = 'Cor Personalizada' }
-                }
+                text = 'HEX',
+                name = 'hex',
+                type = 'text',
+                isRequired = false
             },
             {
-                text = 'Cor (Se escolheste Personalizada)',
+                text = '',
+                name = 'colorpicker',
+                type = 'color',
+                isRequired = false
+            },
+            {
+                text = Lang:t('menu.color'),
                 name = 'color',
                 type = 'select',
                 options = GetXenonList()
+            },
+            {
+                text = Lang:t('menu.toggle'),
+                name = 'toggle',
+                type = 'radio',
+                options = {
+                    { value = 'enable',  text = Lang:t('menu.enabled') },
+                    { value = 'disable', text = Lang:t('menu.disabled') },
+                }
             }
         }
     })
     if not dialog then return end
 
-    -- Remover
     if dialog.toggle == 'disable' then
-        ToggleVehicleMod(vehicle, 22, false) -- 22 é o ID do Xénon
-        TriggerServerEvent('qb-mechanicjob:server:removeItem', 'veh_xenons')
+        ToggleVehicleMod(vehicle, 22, false)
         return
     end
 
-    -- Instalar Padrão (Mais Seguro)
-    if dialog.toggle == 'enable' then
+    if dialog.hex and dialog.hex ~= '' then
+        local color = HexToRGB(dialog.hex)
         ToggleVehicleMod(vehicle, 22, true)
-        SetVehicleXenonLightsColor(vehicle, -1) -- Cor Padrão
-        TriggerServerEvent('qb-mechanicjob:server:removeItem', 'veh_xenons')
+        SetVehicleXenonLightsCustomColor(vehicle, color.r, color.g, color.b)
         return
     end
 
-    -- Instalar Cor (Com verificação de segurança)
-    if dialog.toggle == 'custom' and tonumber(dialog.color) then
+    if dialog.colorpicker and dialog.colorpicker ~= '' then
+        local color = HexToRGB(dialog.colorpicker)
         ToggleVehicleMod(vehicle, 22, true)
-        Wait(100) -- Pequena pausa para o sistema processar
+        SetVehicleXenonLightsCustomColor(vehicle, color.r, color.g, color.b)
+        return
+    end
+
+    if dialog.color and tonumber(dialog.color) then
+        ToggleVehicleMod(vehicle, 22, true)
         SetVehicleXenonLightsColor(vehicle, tonumber(dialog.color))
-        TriggerServerEvent('qb-mechanicjob:server:removeItem', 'veh_xenons')
     end
 end
 
--- Window Tint (Películas)
+-- Window Tint
 
 local function WindowTint(vehicle)
-    local tints = { { header = 'Películas (Vidros Fumados)', isMenuHeader = true, icon = 'fas fa-window-maximize' } }
+    local tints = { { header = Lang:t('menu.window_tint'), isMenuHeader = true, icon = 'fas fa-window-maximize' } }
     if GetNumVehicleWindowTints() > 0 then
         for i = 1, #Config.WindowTints do
             tints[#tints + 1] = {
@@ -599,10 +609,10 @@ local function WindowTint(vehicle)
     exports['qb-menu']:openMenu(tints)
 end
 
--- Plates (Matrículas)
+-- Plates
 
 local function PlateIndex(vehicle)
-    local plates = { { header = 'Estilo de Matrícula', isMenuHeader = true, icon = 'fas fa-id-card' } }
+    local plates = { { header = Lang:t('menu.plate'), isMenuHeader = true, icon = 'fas fa-id-card' } }
     for i = 1, #Config.PlateIndexes do
         plates[#plates + 1] = {
             header = Config.PlateIndexes[i].label,
@@ -619,7 +629,7 @@ local function PlateIndex(vehicle)
     exports['qb-menu']:openMenu(plates)
 end
 
--- Eventos de Servidor e Efeitos
+-- Events
 
 RegisterNetEvent('qb-mechanicjob:client:vehicleSetColors', function(netId, section, colorIndex)
     if not NetworkDoesEntityExistWithNetworkId(netId) then return end
@@ -647,7 +657,7 @@ RegisterNetEvent('qb-mechanicjob:client:vehicleSetColors', function(netId, secti
         SetVehicleExtraColours(vehicle, pearlescentColor, tonumber(colorIndex))
     end
 
-        
+
     local props = QBCore.Functions.GetVehicleProperties(vehicle)
     TriggerServerEvent('qb-mechanicjob:server:SaveVehicleProps', props)
 end)
@@ -673,28 +683,12 @@ RegisterNetEvent('qb-mechanicjob:client:stopParticles', function()
     end
 end)
 
--- EVENTO PRINCIPAL: Instalação e Permissões
-
 RegisterNetEvent('qb-mechanicjob:client:installCosmetic', function(item)
     local vehicle, distance = QBCore.Functions.GetClosestVehicle()
     if vehicle == 0 or distance > 5.0 then return end
-    
     local vehicleClass = GetVehicleClass(vehicle)
     if Config.IgnoreClasses[vehicleClass] then return end
-
-    -- === LÓGICA DE ENGENHARIA === --
-    local PlayerJob = QBCore.Functions.GetPlayerData().job
-    local jobName = PlayerJob.name
-    
-    -- Permitir tanto Benny's (Legal) como Tuners (Ilegal) fazerem estética
-    -- Porque até os criminosos precisam de mudar a cor do carro para fugir!
-    if jobName ~= "bennys" and jobName ~= "tuners" then
-        QBCore.Functions.Notify("Apenas mecânicos autorizados podem modificar a estética!", "error")
-        return
-    end
-
     if GetVehicleModKit(vehicle) ~= 0 then SetVehicleModKit(vehicle, 0) end
-    
     if item == 'veh_interior' then
         OpenInteriors(vehicle)
         TriggerServerEvent('qb-mechanicjob:server:removeItem', item)
@@ -714,10 +708,7 @@ RegisterNetEvent('qb-mechanicjob:client:installCosmetic', function(item)
         WindowTint(vehicle)
         TriggerServerEvent('qb-mechanicjob:server:removeItem', item)
     elseif item == 'veh_plates' then
-        if not IsNearBone(vehicle, 'platelight') then 
-            QBCore.Functions.Notify("Chega-te perto da matrícula!", "error")
-            return 
-        end
+        if not IsNearBone(vehicle, 'platelight') then return end
         PlateIndex(vehicle)
         TriggerServerEvent('qb-mechanicjob:server:removeItem', item)
     end

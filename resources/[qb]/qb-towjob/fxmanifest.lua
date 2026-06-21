@@ -5,14 +5,6 @@ author 'Kakarot'
 description 'Allows players to tow vehicles around the map for money'
 version '1.2.0'
 
-
-dependencies {
-    'qb-core',
-    'qb-inventory',
-    'qb-menu',
-    'qb-target',
-}
-
 shared_scripts {
     '@qb-core/shared/locale.lua',
     'config.lua',

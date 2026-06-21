@@ -1,4 +1,4 @@
-local QBCore = exports['qb-core']:GetCoreObject()
+local QBCore = exports['qb-core']:GetCoreObject({ 'Functions' })
 local UseTarget = GetConvar('UseTarget', 'false') == 'true'
 local InApartment = false
 local ClosestHouse = nil
@@ -662,7 +662,7 @@ RegisterNetEvent('apartments:client:UpdateApartment', function()
     local apartmentLabel = Apartments.Locations[ClosestHouse].label
     QBCore.Functions.TriggerCallback('apartments:GetOwnedApartment', function(result)
         if result == nil then
-            TriggerServerEvent("apartments:server:CreateApartment", apartmentType, apartmentLabel, false)
+            TriggerServerEvent('apartments:server:CreateApartment', apartmentType, apartmentLabel, false)
         else
             TriggerServerEvent('apartments:server:UpdateApartment', apartmentType, apartmentLabel)
         end
@@ -709,19 +709,13 @@ end)
 if UseTarget then
     CreateThread(function()
         local sleep = 5000
-        while true do
-            if not LocalPlayer.state.isLoggedIn then
-                Wait(sleep)
-            else
-                break
-            end
+        while not LocalPlayer.state.isLoggedIn do
+            -- do nothing
+            Wait(sleep)
         end
 
         while true do
             sleep = 1000
-            if not LocalPlayer or not LocalPlayer.state or not LocalPlayer.state.isLoggedIn then
-                break
-            end
 
             if not InApartment then
                 SetClosestApartment()
@@ -735,33 +729,27 @@ if UseTarget then
 else
     CreateThread(function()
         local sleep = 5000
-        while true do
-            if not LocalPlayer.state.isLoggedIn then
-                Wait(sleep)
-            else
-                break
-            end
+        while not LocalPlayer.state.isLoggedIn do
+            -- do nothing
+            Wait(sleep)
         end
 
         while true do
             sleep = 1000
-            if not LocalPlayer or not LocalPlayer.state or not LocalPlayer.state.isLoggedIn then
-                break
-            end
 
             if not InApartment then
                 SetClosestApartment()
                 SetApartmentsEntranceTargets()
 
                 if IsInsideEntranceZone then
-                    sleep = 50
+                    sleep = 0
                     if IsControlJustPressed(0, 38) then
                         OpenEntranceMenu()
                         exports['qb-core']:HideText()
                     end
                 end
             elseif InApartment then
-                sleep = 50
+                sleep = 0
 
                 SetInApartmentTargets()
 

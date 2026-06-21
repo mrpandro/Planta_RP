@@ -5,13 +5,6 @@ author 'Kakarot'
 description 'Door management system allowing players to lock and unlock doors'
 version '2.0.0'
 
-
-dependencies {
-    'qb-core',
-    'qb-input',
-    'qb-minigames',
-}
-
 ui_page 'html/index.html'
 
 shared_scripts {
@@ -22,8 +15,8 @@ shared_scripts {
     'locales/*.lua'
 }
 
-server_script 'server/main.lua'
-client_script 'client/main.lua'
+server_script 'server.lua'
+client_script 'client.lua'
 
 files {
     'html/*.html',

@@ -3,15 +3,7 @@ game 'gta5'
 lua54 'yes'
 author 'Kakarot'
 description 'Employee management system allowing players to hire/fire other players'
-version '2.1.2'
-
-
-dependencies {
-    'qb-core',
-    'qb-inventory',
-    'qb-menu',
-    'qb-target',
-}
+version '2.2.0'
 
 shared_scripts {
     '@qb-core/shared/locale.lua',

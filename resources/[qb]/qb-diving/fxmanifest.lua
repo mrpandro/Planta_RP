@@ -5,13 +5,6 @@ author 'Kakarot'
 description 'Allows players to dive and search for materials underwater to sell'
 version '1.2.1'
 
-
-dependencies {
-    'qb-core',
-    'qb-inventory',
-    'qb-target',
-}
-
 shared_script {
     '@qb-core/shared/locale.lua',
     'locales/en.lua',
@@ -19,10 +12,10 @@ shared_script {
     'config.lua'
 }
 
-server_script 'server/main.lua'
+server_script 'server.lua'
 
 client_scripts {
     '@PolyZone/client.lua',
     '@PolyZone/BoxZone.lua',
-    'client/main.lua'
+    'client.lua'
 }

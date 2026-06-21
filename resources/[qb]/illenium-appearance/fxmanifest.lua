@@ -4,13 +4,7 @@ game "gta5"
 author "snakewiz & iLLeniumStudios"
 description "A flexible player customization script for FiveM servers."
 repository "https://github.com/iLLeniumStudios/illenium-appearance"
-version "v5.7.0"
-
-
-dependencies {
-  'qb-core',
-  'qb-target',
-}
+version "main"
 
 lua54 "yes"
 
@@ -78,15 +72,25 @@ shared_scripts {
   "shared/framework/framework.lua",
   "shared/framework/esx/util.lua",
   "locales/locales.lua",
-  'locales/pt-PT.lua',
-  'locales/en.lua',
+  "locales/ar.lua",
+  "locales/bg.lua",
+  "locales/cs.lua",
+  "locales/de.lua",
+  "locales/en.lua",
+  "locales/es-ES.lua",
+  "locales/fr.lua",
+  "locales/hu.lua",
+  "locales/it.lua",
+  "locales/nl.lua",
+  "locales/pt-BR.lua",
+  "locales/ro-RO.lua",
+  "locales/id.lua",
   "@ox_lib/init.lua"
 }
 
 files {
   "web/dist/index.html",
-  "web/dist/assets/*.js",
-  'locales/*.lua'
+  "web/dist/assets/*.js"
 }
 
 ui_page "web/dist/index.html"

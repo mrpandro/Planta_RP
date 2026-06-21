@@ -1,4 +1,5 @@
-QBCore = exports['qb-core']:GetCoreObject()
+QBCore = exports['qb-core']:GetCoreObject({ 'Functions' })
+sharedItems = exports['qb-core']:GetShared('Items')
 local currentDealer = nil
 local dealerIsHome = false
 local waitingDelivery = nil
@@ -176,7 +177,7 @@ local function RequestDelivery()
             TriggerServerEvent('qb-phone:server:sendNewMail', {
                 sender = Config.Dealers[currentDealer]['name'],
                 subject = 'Delivery Location',
-                message = Lang:t('info.delivery_info_email', { itemAmount = amount, itemLabel = QBCore.Shared.Items[waitingDelivery['itemData']['item']]['label'] }),
+                message = Lang:t('info.delivery_info_email', { itemAmount = amount, itemLabel = sharedItems[waitingDelivery['itemData']['item']]['label'] }),
                 button = {
                     enabled = true,
                     buttonEvent = 'qb-drugs:client:setLocation',
@@ -436,7 +437,7 @@ RegisterNetEvent('qb-drugs:client:setLocation', function(locationData)
         drugDeliveryZone:onPlayerInOut(function(isPointInside)
             if isPointInside then
                 local inDeliveryZone = true
-                exports['qb-core']:DrawText(Lang:t('info.deliver_items_button', { itemAmount = activeDelivery['amount'], itemLabel = QBCore.Shared.Items[activeDelivery['itemData']['item']]['label'] }), 'left')
+                exports['qb-core']:DrawText(Lang:t('info.deliver_items_button', { itemAmount = activeDelivery['amount'], itemLabel = sharedItems[activeDelivery['itemData']['item']]['label'] }), 'left')
                 CreateThread(function()
                     while inDeliveryZone do
                         if IsControlJustPressed(0, 38) then

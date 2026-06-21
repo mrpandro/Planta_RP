@@ -7,11 +7,6 @@ function ToggleUI(bool)
 	})
 end
 
---- @param perms table
-function CheckPerms(perms)
-	return lib.callback.await('ps-adminmenu:callback:CheckPerms', false, perms)
-end
-
 function CheckDataFromKey(key)
 	local actions = Config.Actions[key]
 	if actions then

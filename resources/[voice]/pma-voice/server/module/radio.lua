@@ -1,3 +1,6 @@
+
+local msgpack_pack_args = msgpack.pack_args
+
 local radioChecks = {}
 
 --- checks if the player can join the channel specified
@@ -29,10 +32,32 @@ end
 
 exports('addChannelCheck', addChannelCheck)
 
+--- removes any check for the channel
+---@param channel number the channel to add a check to
+function removeChannelCheck(channel)
+	local channelType = type(channel)
+	if channelType ~= "number" then
+		error(("'channel' expected 'number' got '%s'"):format(channelType))
+	end
+	radioChecks[channel] = nil
+	logger.info("%s removed check for channel %s", GetInvokingResource(), channel)
+end
+
+exports("removeChannelCheck", removeChannelCheck)
+
 local function radioNameGetter_orig(source)
 	return GetPlayerName(source)
 end
 local radioNameGetter = radioNameGetter_orig
+
+--- triggers an event for all of the players in the table while only doing msgpack
+--- serialization once
+local function triggerEventForRadioChannel(eventName, radioTbl, ...)
+		local payload = msgpack_pack_args(...)
+		for player, _ in pairs(radioTbl) do
+			TriggerClientEventInternal(eventName, player, payload, payload:len())
+		end
+end
 
 --- adds a check to the channel, function is expected to return a boolean of true or false
 ---@param cb function the function to execute the check on
@@ -64,9 +89,7 @@ function addPlayerToRadio(source, radioChannel)
 	-- if not create it (basically if not radiodata make radiodata)
 	radioData[radioChannel] = radioData[radioChannel] or {}
 	local plyName = radioNameGetter(source)
-	for player, _ in pairs(radioData[radioChannel]) do
-		TriggerClientEvent('pma-voice:addPlayerToRadio', player, source, plyName)
-	end
+	triggerEventForRadioChannel('pma-voice:addPlayerToRadio', radioData[radioChannel], source, plyName)
 	voiceData[source] = voiceData[source] or defaultTable(source)
 	voiceData[source].radio = radioChannel
 	radioData[radioChannel][source] = false
@@ -81,9 +104,7 @@ end
 function removePlayerFromRadio(source, radioChannel)
 	logger.verbose('[radio] Removed %s from radio %s', source, radioChannel)
 	radioData[radioChannel] = radioData[radioChannel] or {}
-	for player, _ in pairs(radioData[radioChannel]) do
-		TriggerClientEvent('pma-voice:removePlayerFromRadio', player, source)
-	end
+	triggerEventForRadioChannel('pma-voice:removePlayerFromRadio', radioData[radioChannel], source)
 	radioData[radioChannel][source] = nil
 	voiceData[source] = voiceData[source] or defaultTable(source)
 	voiceData[source].radio = 0
@@ -141,13 +162,7 @@ function setTalkingOnRadio(talking)
 	if radioTbl then
 		radioTbl[source] = talking
 		logger.verbose('[radio] Set %s to talking: %s on radio %s', source, talking, plyVoice.radio)
-		for player, _ in pairs(radioTbl) do
-			if player ~= source then
-				TriggerClientEvent('pma-voice:setTalkingOnRadio', player, source, talking)
-				logger.verbose('[radio] Sync %s to let them know %s is %s', player, source,
-					talking and 'talking' or 'not talking')
-			end
-		end
+		triggerEventForRadioChannel('pma-voice:setTalkingOnRadio', radioTbl, source, talking)
 	end
 end
 

@@ -3,12 +3,7 @@ game 'gta5'
 lua54 'yes'
 author 'Kakarot'
 description 'Allows players to select a spawn point from a list of available locations'
-version '1.2.0'
-
-
-dependencies {
-    'qb-core',
-}
+version '1.5.0'
 
 shared_scripts {
     '@qb-core/shared/locale.lua',

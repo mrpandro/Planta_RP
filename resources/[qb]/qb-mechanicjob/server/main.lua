@@ -1,4 +1,5 @@
-local QBCore = exports['qb-core']:GetCoreObject()
+local QBCore = exports['qb-core']:GetCoreObject({ 'Functions', 'Commands' })
+local sharedItems = exports['qb-core']:GetShared('Items')
 local vehicleComponents = {}
 local drivingDistance = {}
 local tunedVehicles = {}
@@ -7,7 +8,6 @@ local nitrousVehicles = {}
 -- Functions
 
 function Trim(plate)
-    if not plate then return nil end
     return (string.gsub(plate, '^%s*(.-)%s*$', '%1'))
 end
 
@@ -99,13 +99,13 @@ RegisterNetEvent('qb-mechanicjob:server:stash', function(data)
     local src = source
     local shopName = data.job
     if not Config.Shops[shopName] then return end
-    local Player = QBCore.Functions.GetPlayer(src)
+    local Player = exports['qb-core']:GetPlayer(src)
     if not Player then return end
     if Config.Shops[shopName].managed and Player.PlayerData.job.name ~= shopName then return end
     local playerPed = GetPlayerPed(src)
     local playerCoords = GetEntityCoords(playerPed)
     local stashCoords = Config.Shops[shopName].stash
-    if #(playerCoords - stashCoords) < 5.0 then
+    if #(playerCoords - stashCoords) < 2.5 then
         local stashName = shopName .. '_stash'
         exports['qb-inventory']:OpenInventory(src, stashName, {
             maxweight = 4000000,
@@ -144,6 +144,9 @@ RegisterNetEvent('qb-mechanicjob:server:sprayVehicle', function(netId, primary, 
     if colors.primary then
         StartParticles(vehicleCoords, netId, colors.primary)
         Wait(Config.PaintTime * 1000)
+        -- local _, colorSecondary = GetVehicleColours(vehicle)
+        -- ClearVehicleCustomPrimaryColour(vehicle) -- does not exist yet
+        -- SetVehicleColours(vehicle, tonumber(primary), colorSecondary)
         TriggerClientEvent('qb-mechanicjob:client:vehicleSetColors', -1, netId, 'primary', primary)
         StopParticles()
     end
@@ -151,6 +154,9 @@ RegisterNetEvent('qb-mechanicjob:server:sprayVehicle', function(netId, primary, 
     if colors.secondary then
         StartParticles(vehicleCoords, netId, colors.secondary)
         Wait(Config.PaintTime * 1000)
+        -- local colorPrimary, _ = GetVehicleColours(vehicle)
+        -- ClearVehicleCustomSecondaryColour(vehicle) -- does not exist yet
+        -- SetVehicleColours(vehicle, colorPrimary, tonumber(secondary))
         TriggerClientEvent('qb-mechanicjob:client:vehicleSetColors', -1, netId, 'secondary', secondary)
         StopParticles()
     end
@@ -158,6 +164,8 @@ RegisterNetEvent('qb-mechanicjob:server:sprayVehicle', function(netId, primary, 
     if colors.pearlescent then
         StartParticles(vehicleCoords, netId, colors.pearlescent)
         Wait(Config.PaintTime * 1000)
+        -- local pearlescentColor, wheelColor = GetVehicleExtraColours(vehicle) -- does not exist yet
+        -- SetVehicleExtraColours(vehicle, tonumber(pearlescent) or pearlescentColor, tonumber(wheel) or wheelColor) -- does not exist yet
         TriggerClientEvent('qb-mechanicjob:client:vehicleSetColors', -1, netId, 'pearlescent', pearlescent)
         StopParticles()
     end
@@ -165,6 +173,8 @@ RegisterNetEvent('qb-mechanicjob:server:sprayVehicle', function(netId, primary, 
     if colors.wheel then
         StartParticles(vehicleCoords, netId, colors.wheel)
         Wait(Config.PaintTime * 1000)
+        -- local pearlescentColor, wheelColor = GetVehicleExtraColours(vehicle) -- does not exist yet
+        -- SetVehicleExtraColours(vehicle, tonumber(pearlescent) or pearlescentColor, tonumber(wheel) or wheelColor) -- does not exist yet
         TriggerClientEvent('qb-mechanicjob:client:vehicleSetColors', -1, netId, 'wheel', wheel)
         StopParticles()
     end
@@ -208,11 +218,7 @@ end)
 
 RegisterNetEvent('qb-mechanicjob:server:updateVehicleComponents', function(plate, componentData)
     if plate and componentData then
-        if vehicleComponents[plate] then
-            vehicleComponents[plate] = componentData
-        else
-            vehicleComponents[plate] = componentData
-        end
+        vehicleComponents[plate] = componentData
     end
     local isOwned = IsVehicleOwned(plate)
     if isOwned then MySQL.update('UPDATE player_vehicles SET status = ? WHERE plate = ?', { json.encode(vehicleComponents[plate]), plate }) end
@@ -232,18 +238,14 @@ end)
 
 RegisterNetEvent('qb-mechanicjob:server:removeItem', function(part, amount)
     local src = source
-    local Player = QBCore.Functions.GetPlayer(src)
+    local Player = exports['qb-core']:GetPlayer(src)
     if not Player then return end
     if not amount then amount = 1 end
-    
-    if not exports['qb-inventory']:RemoveItem(src, part, amount, false, 'qb-mechanicjob:server:removeItem') then 
-        -- DropPlayer desativado para evitar kicks desnecessários
-    end
-    
-    TriggerClientEvent('qb-inventory:client:ItemBox', src, QBCore.Shared.Items[part], 'remove')
+    if not exports['qb-inventory']:RemoveItem(src, part, amount, false, 'qb-mechanicjob:server:removeItem') then DropPlayer(src, 'qb-mechanicjob:server:removeItem') end
+    TriggerClientEvent('qb-inventory:client:ItemBox', src, sharedItems[part], 'remove')
 end)
 
--- Items Usáveis
+-- Items
 
 local performanceParts = {
     'veh_armor',
@@ -256,7 +258,7 @@ local performanceParts = {
 
 for i = 1, #performanceParts do
     QBCore.Functions.CreateUseableItem(performanceParts[i], function(source, item)
-        local Player = QBCore.Functions.GetPlayer(source)
+        local Player = exports['qb-core']:GetPlayer(source)
         if not Player then return end
         if Config.RequireJob and Player.PlayerData.job.type ~= 'mechanic' then return end
         TriggerClientEvent('qb-mechanicjob:client:installPart', source, item.name)
@@ -275,7 +277,7 @@ local cosmeticParts = {
 
 for i = 1, #cosmeticParts do
     QBCore.Functions.CreateUseableItem(cosmeticParts[i], function(source, item)
-        local Player = QBCore.Functions.GetPlayer(source)
+        local Player = exports['qb-core']:GetPlayer(source)
         if not Player then return end
         if Config.RequireJob and Player.PlayerData.job.type ~= 'mechanic' then return end
         TriggerClientEvent('qb-mechanicjob:client:installCosmetic', source, item.name)
@@ -283,60 +285,53 @@ for i = 1, #cosmeticParts do
 end
 
 QBCore.Functions.CreateUseableItem('veh_toolbox', function(source)
-    local Player = QBCore.Functions.GetPlayer(source)
+    local Player = exports['qb-core']:GetPlayer(source)
     if not Player then return end
     if Config.RequireJob and Player.PlayerData.job.type ~= 'mechanic' then return end
     TriggerClientEvent('qb-mechanicjob:client:PartsMenu', source)
 end)
 
--- SEGURANÇA MÁXIMA: PORTÁTIL SÓ PARA TUNERS
 QBCore.Functions.CreateUseableItem('tunerlaptop', function(source)
-    local Player = QBCore.Functions.GetPlayer(source)
+    local Player = exports['qb-core']:GetPlayer(source)
     if not Player then return end
-    
-    -- Aqui está o segredo: Verificar se o job.name é EXATAMENTE 'tuners'
-    if Player.PlayerData.job.name ~= 'tuners' then
-        TriggerClientEvent('QBCore:Notify', source, 'Apenas especialistas em Tuning sabem usar este software!', 'error')
-        return
-    end
-    
-    TriggerClientEvent('qb-tunerchip:client:openMenu', source) 
+    if Config.RequireJob and Player.PlayerData.job.type ~= 'mechanic' then return end
+    TriggerClientEvent('qb-mechanicjob:client:openChip', source)
 end)
 
 QBCore.Functions.CreateUseableItem('nitrous', function(source)
-    local Player = QBCore.Functions.GetPlayer(source)
+    local Player = exports['qb-core']:GetPlayer(source)
     if not Player then return end
     if Config.RequireJob and Player.PlayerData.job.type ~= 'mechanic' then return end
     TriggerClientEvent('qb-mechanicjob:client:installNitrous', source)
 end)
 
 QBCore.Functions.CreateUseableItem('tirerepairkit', function(source)
-    local Player = QBCore.Functions.GetPlayer(source)
+    local Player = exports['qb-core']:GetPlayer(source)
     if not Player then return end
     TriggerClientEvent('qb-mechanicjob:client:repairTire', source)
 end)
 
 QBCore.Functions.CreateUseableItem('repairkit', function(source)
-    local Player = QBCore.Functions.GetPlayer(source)
+    local Player = exports['qb-core']:GetPlayer(source)
     if not Player then return end
     TriggerClientEvent('qb-mechanicjob:client:repairVehicle', source)
 end)
 
 QBCore.Functions.CreateUseableItem('advancedrepairkit', function(source)
-    local Player = QBCore.Functions.GetPlayer(source)
+    local Player = exports['qb-core']:GetPlayer(source)
     if not Player then return end
     TriggerClientEvent('qb-mechanicjob:client:repairVehicleFull', source)
 end)
 
 QBCore.Functions.CreateUseableItem('cleaningkit', function(source)
-    local Player = QBCore.Functions.GetPlayer(source)
+    local Player = exports['qb-core']:GetPlayer(source)
     if not Player then return end
     TriggerClientEvent('qb-mechanicjob:client:cleanVehicle', source)
 end)
 
 -- Commands
 
-QBCore.Commands.Add('fix', 'Reparar veículo (Admin)', {}, false, function(source)
+QBCore.Commands.Add('fix', 'Repair your vehicle (Admin Only)', {}, false, function(source)
     local ped = GetPlayerPed(source)
     local vehicle = GetVehiclePedIsIn(ped, false)
     if not vehicle then return end
@@ -350,85 +345,3 @@ QBCore.Commands.Add('fix', 'Reparar veículo (Admin)', {}, false, function(sourc
     end
     TriggerClientEvent('qb-mechanicjob:client:fixEverything', source)
 end, 'admin')
-
--- === EVENTOS DE PERSISTÊNCIA DO TUNER LAPTOP (SISTEMA DEDICADO & DEBUG) === --
-
--- Obter Tuning Guardado (Callback)
-QBCore.Functions.CreateCallback('qb-tunerchip:server:GetTuningData', function(source, cb, plate)
-    -- Limpeza de matrícula obrigatória para evitar erros de espaços
-    local cleanPlate = Trim(plate)
-    
-    if not cleanPlate then 
-        cb(nil) 
-        return 
-    end
-
-    MySQL.query('SELECT data FROM vehicle_tuning WHERE plate = ?', {cleanPlate}, function(result)
-        if result[1] and result[1].data then
-            print('^2[TunerChip DEBUG] Dados encontrados para: "' .. cleanPlate .. '"^7')
-            cb(json.decode(result[1].data))
-        else
-            print('^3[TunerChip DEBUG] Sem dados para: "' .. cleanPlate .. '"^7')
-            cb(nil)
-        end
-    end)
-end)
-
--- Gravar Suspensão (Stance)
-RegisterNetEvent('qb-tunerchip:server:SaveStanceData', function(plate, height)
-    local src = source
-    local cleanPlate = Trim(plate)
-    
-    if not cleanPlate then return end
-    
-    print('^3[TunerChip DEBUG] A gravar Stance (' .. height .. ') para: "' .. cleanPlate .. '"^7')
-
-    MySQL.query('SELECT data FROM vehicle_tuning WHERE plate = ?', {cleanPlate}, function(result)
-        local tuningData = {}
-        if result[1] and result[1].data then
-            tuningData = json.decode(result[1].data)
-        end
-        
-        tuningData.suspension = height -- Atualiza só a suspensão
-
-        MySQL.insert('INSERT INTO vehicle_tuning (plate, data) VALUES (:plate, :data) ON DUPLICATE KEY UPDATE data = :data', {
-            ['plate'] = cleanPlate,
-            ['data'] = json.encode(tuningData)
-        })
-        print('^2[TunerChip DEBUG] Stance gravado com sucesso!^7')
-    end)
-end)
-
--- Gravar Performance (Stage 3)
-RegisterNetEvent('qb-tunerchip:server:SaveTuningData', function(plate, data)
-    local src = source
-    local cleanPlate = Trim(plate)
-    
-    if not cleanPlate or not data then return end
-
-    print('^3[TunerChip DEBUG] A gravar Performance para: "' .. cleanPlate .. '"^7')
-
-    MySQL.query('SELECT data FROM vehicle_tuning WHERE plate = ?', {cleanPlate}, function(result)
-        local tuningData = {}
-        if result[1] and result[1].data then
-            tuningData = json.decode(result[1].data)
-        end
-        
-        tuningData.performance = data -- Atualiza só a performance
-
-        MySQL.insert('INSERT INTO vehicle_tuning (plate, data) VALUES (:plate, :data) ON DUPLICATE KEY UPDATE data = :data', {
-            ['plate'] = cleanPlate,
-            ['data'] = json.encode(tuningData)
-        })
-        print('^2[TunerChip DEBUG] Performance gravada com sucesso!^7')
-    end)
-end)
-
--- Resetar Tuning
-RegisterNetEvent('qb-tunerchip:server:ResetTuningData', function(plate)
-    local cleanPlate = Trim(plate)
-    if not cleanPlate then return end
-    
-    MySQL.query('DELETE FROM vehicle_tuning WHERE plate = ?', {cleanPlate})
-    print('^1[TunerChip DEBUG] Tuning apagado para: "' .. cleanPlate .. '"^7')
-end)

@@ -58,6 +58,37 @@ lib.callback.register('ps-adminmenu:callback:GetPlayers', function(source)
     return getPlayers()
 end)
 
+local function resolveGrade(grades, input)
+    if not grades then return nil, nil end
+
+    local gradeKey = tonumber(input) or input
+    local gradeData = grades[gradeKey] or grades[tostring(gradeKey)]
+    local gradeValue = tonumber(input) or input
+
+    if gradeData then
+        if gradeData.grade ~= nil then
+            gradeValue = gradeData.grade
+        elseif gradeData.level ~= nil then
+            gradeValue = gradeData.level
+        elseif gradeData.id ~= nil then
+            gradeValue = gradeData.id
+        end
+        return gradeData, gradeValue
+    end
+
+    for _, v in pairs(grades) do
+        local candidate = v.grade or v.level or v.id or v.rank or v.order
+        if candidate ~= nil and tostring(candidate) == tostring(input) then
+            return v, candidate
+        end
+        if v.name and tostring(v.name) == tostring(input) then
+            return v, candidate or gradeValue
+        end
+    end
+
+    return nil, nil
+end
+
 -- Set Job
 RegisterNetEvent('ps-adminmenu:server:SetJob', function(data, selectedData)
     local data = CheckDataFromKey(data)
@@ -66,12 +97,12 @@ RegisterNetEvent('ps-adminmenu:server:SetJob', function(data, selectedData)
     local playerId, Job, Grade = selectedData["Player"].value, selectedData["Job"].value, selectedData["Grade"].value
     local Player = QBCore.Functions.GetPlayer(playerId)
     if not Player then
-        QBCore.Functions.Notify(src, locale("not_online"), 'error', 5000)
+        TriggerClientEvent('QBCore:Notify', source, locale("not_online"), 'error')
         return
     end
     local name = Player.PlayerData.charinfo.firstname .. ' ' .. Player.PlayerData.charinfo.lastname
     local jobInfo = QBCore.Shared.Jobs[Job]
-    local grade = jobInfo and jobInfo["grades"] and jobInfo["grades"][selectedData["Grade"].value]
+    local grade, gradeValue = resolveGrade(jobInfo and jobInfo["grades"], Grade)
 
     if not jobInfo then
         TriggerClientEvent('QBCore:Notify', source, "Not a valid job", 'error')
@@ -83,7 +114,7 @@ RegisterNetEvent('ps-adminmenu:server:SetJob', function(data, selectedData)
         return
     end
 
-    Player.Functions.SetJob(tostring(Job), tonumber(Grade))
+    Player.Functions.SetJob(tostring(Job), tonumber(gradeValue) or gradeValue)
     if Config.RenewedPhone then
         exports['qb-phone']:hireUser(tostring(Job), Player.PlayerData.citizenid, tonumber(Grade))
     end
@@ -99,12 +130,12 @@ RegisterNetEvent('ps-adminmenu:server:SetGang', function(data, selectedData)
     local playerId, Gang, Grade = selectedData["Player"].value, selectedData["Gang"].value, selectedData["Grade"].value
     local Player = QBCore.Functions.GetPlayer(playerId)
     if not Player then
-        QBCore.Functions.Notify(src, locale("not_online"), 'error', 5000)
+        TriggerClientEvent('QBCore:Notify', source, locale("not_online"), 'error')
         return
     end
     local name = Player.PlayerData.charinfo.firstname .. ' ' .. Player.PlayerData.charinfo.lastname
     local GangInfo = QBCore.Shared.Gangs[Gang]
-    local grade = GangInfo and GangInfo["grades"] and GangInfo["grades"][selectedData["Grade"].value]
+    local grade, gradeValue = resolveGrade(GangInfo and GangInfo["grades"], Grade)
 
     if not GangInfo then
         TriggerClientEvent('QBCore:Notify', source, "Not a valid Gang", 'error')
@@ -116,7 +147,7 @@ RegisterNetEvent('ps-adminmenu:server:SetGang', function(data, selectedData)
         return
     end
 
-    Player.Functions.SetGang(tostring(Gang), tonumber(Grade))
+    Player.Functions.SetGang(tostring(Gang), tonumber(gradeValue) or gradeValue)
     QBCore.Functions.Notify(src, locale("gangset", name, Gang, Grade), 'success', 5000)
 end)
 

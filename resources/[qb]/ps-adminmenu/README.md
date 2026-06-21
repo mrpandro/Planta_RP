@@ -102,8 +102,8 @@ Made by Avilchiis for the community, you can download it [here](https://github.c
 * Warn player
 
 # Depedency
-1. [qb-core](https://github.com/qbcore-framework/qb-core)
-2. [ox_lib](https://github.com/overextended/ox_lib)
+1. [qb-core](https://github.com/qbcore-framework/qb-core) or [qbox_core](https://github.com/Qbox-project/qbx_core)
+3. [ox_lib](https://github.com/overextended/ox_lib)
 
 # Installation
 1. Download the latest release.

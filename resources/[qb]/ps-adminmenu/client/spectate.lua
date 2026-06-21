@@ -27,7 +27,7 @@ end)
 
 CreateThread(function()
     while true do
-        Wait(100)
+        Wait(0)
         if spectateInfo['toggled'] then
             local targetPed = NetworkGetEntityFromNetworkId(spectateInfo.targetPed)
             if DoesEntityExist(targetPed) then
@@ -38,11 +38,7 @@ CreateThread(function()
                 end
             else
                 TriggerServerEvent('ps-adminmenu:spectate:teleport', spectateInfo['target'])
-                local waitTimeout = 0
-                while not DoesEntityExist(NetworkGetEntityFromNetworkId(spectateInfo.targetPed)) and waitTimeout < 50 do
-                    Wait(100)
-                    waitTimeout = waitTimeout + 1
-                end
+                while not DoesEntityExist(NetworkGetEntityFromNetworkId(spectateInfo.targetPed)) do Wait(100) end
             end
         else
             Wait(500)

@@ -1,32 +1,23 @@
 -- Toggles Invincibility
 local visible = true
 RegisterNetEvent('ps-adminmenu:client:ToggleInvisible', function(data)
-    local data = CheckDataFromKey(data)
-    if not data or not CheckPerms(data.perms) then return end
     visible = not visible
-
     SetEntityVisible(cache.ped, visible, 0)
 end)
 
 -- God Mode
 local godmode = false
 RegisterNetEvent('ps-adminmenu:client:ToggleGodmode', function(data)
-    local data = CheckDataFromKey(data)
-    if not data or not CheckPerms(data.perms) then return end
     godmode = not godmode
 
     if godmode then
         QBCore.Functions.Notify(locale("godmode", "enabled"), 'primary')
-        CreateThread(function()
-            while godmode do
-                Wait(100)
-                if godmode then
-                    SetPlayerInvincible(cache.playerId, true)
-                end
-            end
-            SetPlayerInvincible(cache.playerId, false)
-            QBCore.Functions.Notify(locale("godmode", "disabled"), 'primary')
-        end)
+        while godmode do
+            Wait(0)
+            SetPlayerInvincible(cache.playerId, true)
+        end
+        SetPlayerInvincible(cache.playerId, false)
+        QBCore.Functions.Notify(locale("godmode", "disabled"), 'primary')
     end
 end)
 
@@ -59,30 +50,28 @@ local function CopyCoords(data)
 end
 
 RegisterCommand("vector2", function()
-    if not CheckPerms('mod') then return end
-    CopyCoords("vector2")
+    TriggerServerEvent('ps-adminmenu:server:ValidateCommand', 'vector2', 'mod')
 end, false)
 
 RegisterCommand("vector3", function()
-    if not CheckPerms('mod') then return end
-    CopyCoords("vector3")
+    TriggerServerEvent('ps-adminmenu:server:ValidateCommand', 'vector3', 'mod')
 end, false)
 
 RegisterCommand("vector4", function()
-    if not CheckPerms('mod') then return end
-    CopyCoords("vector4")
+    TriggerServerEvent('ps-adminmenu:server:ValidateCommand', 'vector4', 'mod')
 end, false)
 
 RegisterCommand("heading", function()
-    if not CheckPerms('mod') then return end
-    CopyCoords("heading")
+    TriggerServerEvent('ps-adminmenu:server:ValidateCommand', 'heading', 'mod')
 end, false)
+
+RegisterNetEvent('ps-adminmenu:client:CopyCoords', function(type)
+    CopyCoords(type)
+end)
 
 -- Infinite Ammo
 local InfiniteAmmo = false
 RegisterNetEvent('ps-adminmenu:client:setInfiniteAmmo', function(data)
-    local data = CheckDataFromKey(data)
-    if not data or not CheckPerms(data.perms) then return end
     InfiniteAmmo = not InfiniteAmmo
 
     if GetAmmoInPedWeapon(cache.ped, cache.weapon) < 6 then
@@ -120,9 +109,6 @@ local function showCoordsMenu()
 end
 
 RegisterNetEvent('ps-adminmenu:client:ToggleCoords', function(data)
-    local data = CheckDataFromKey(data)
-    if not data or not CheckPerms(data.perms) then return end
-
     showCoords = not showCoords
 
     if showCoords then
@@ -132,9 +118,6 @@ end)
 
 -- Set Ammo
 RegisterNetEvent('ps-adminmenu:client:SetAmmo', function(data, selectedData)
-    local data = CheckDataFromKey(data)
-    if not data or not CheckPerms(data.perms) then return end
-
     local ammo = selectedData["Ammo Amount"].value
     local weapon = GetSelectedPedWeapon(cache.ped)
 
@@ -146,8 +129,11 @@ RegisterNetEvent('ps-adminmenu:client:SetAmmo', function(data, selectedData)
     end
 end)
 
-RegisterCommand("setammo", function(source)
-    if not CheckPerms('mod') then return end
+RegisterCommand("setammo", function()
+    TriggerServerEvent('ps-adminmenu:server:ValidateCommand', 'setammo', 'mod')
+end, false)
+
+RegisterNetEvent('ps-adminmenu:client:SetAmmoCommand', function()
     local weapon = GetSelectedPedWeapon(cache.ped)
     local ammo = 999
     if weapon ~= nil then
@@ -156,15 +142,12 @@ RegisterCommand("setammo", function(source)
     else
         QBCore.Functions.Notify(locale("no_weapon"), 'error')
     end
-end, false)
+end)
 
 --Toggle Dev
 local ToggleDev = false
 
 RegisterNetEvent('ps-adminmenu:client:ToggleDev', function(dataKey)
-    local data = CheckDataFromKey(dataKey)
-    if not data or not CheckPerms(data.perms) then return end
-
     ToggleDev = not ToggleDev
 
     TriggerEvent("qb-admin:client:ToggleDevmode")              -- toggle dev mode (ps-hud/qb-hud)
@@ -186,7 +169,7 @@ local toogleAdmin = lib.addKeybind({
 
 --noclip
 RegisterCommand('nc', function()
-    TriggerEvent(Config.Actions["noclip"].event)
+    TriggerServerEvent('ps-adminmenu:server:ValidateClientAction', 'noclip', nil, Config.Actions["noclip"].event, Config.Actions["noclip"].perms)
 end, false)
 
 local toogleNoclip = lib.addKeybind({

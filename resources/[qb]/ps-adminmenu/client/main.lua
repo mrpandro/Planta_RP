@@ -1,4 +1,5 @@
-QBCore = exports['qb-core']:GetCoreObject()
+local coreResource = Config.Core == "qbx_core" and "qb-core" or Config.Core
+QBCore = exports[coreResource]:GetCoreObject()
 PlayerData = {}
 
 -- Functions
@@ -39,10 +40,10 @@ RegisterNUICallback("clickButton", function(data)
 	local selectedData = data.selectedData
 	local key = data.data
 	local data = CheckDataFromKey(key)
-	if not data or not CheckPerms(data.perms) then return end
+	if not data then return end
 
 	if data.type == "client" then
-		TriggerEvent(data.event, key, selectedData)
+		TriggerServerEvent('ps-adminmenu:server:ValidateClientAction', key, selectedData, data.event, data.perms)
 	elseif data.type == "server" then
 		TriggerServerEvent(data.event, key, selectedData)
 	elseif data.type == "command" then

@@ -5,9 +5,7 @@ author 'Kakarot'
 description 'Menu that allows players to input information for various things'
 version '1.2.0'
 
-client_scripts {
-    'client/*.lua'
-}
+client_script 'client.lua'
 
 ui_page 'html/index.html'
 

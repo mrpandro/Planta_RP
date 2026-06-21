@@ -210,13 +210,14 @@ RegisterCommand('+radiotalk', function()
 				LocalPlayer.state:set("radioActive", true, true);
 				local checkFailed = false
 				while radioPressed do
-					if radioChannel < 0 or isDead() or not isRadioEnabled() then
+					local ped = PlayerPedId()
+					if radioChannel < 0 or isDead() or not isRadioEnabled() or (GetConvarBool("voice_disableRadioWhenShooting", false) and IsPedShooting(ped)) then
 						checkFailed = true
 						break
 					end
 					if shouldPlayAnimation and HasAnimDictLoaded(dict) then
-						if not IsEntityPlayingAnim(PlayerPedId(), dict, anim, 3) then
-							TaskPlayAnim(PlayerPedId(), dict, anim, 8.0, 2.0, -1, 50, 2.0, false,
+						if not IsEntityPlayingAnim(ped, dict, anim, 3) then
+							TaskPlayAnim(ped, dict, anim, 8.0, 2.0, -1, 50, 2.0, false,
 								false,
 							false)
 						end

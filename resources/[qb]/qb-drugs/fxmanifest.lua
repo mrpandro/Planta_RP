@@ -5,13 +5,6 @@ author 'Kakarot'
 description 'Allows players to deliver packages and sell drugs to npcs'
 version '1.3.0'
 
-
-dependencies {
-    'qb-core',
-    'qb-inventory',
-    'qb-target',
-}
-
 shared_scripts {
     'config.lua',
     '@qb-core/shared/locale.lua',

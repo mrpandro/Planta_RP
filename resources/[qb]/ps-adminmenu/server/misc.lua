@@ -3,16 +3,46 @@ RegisterNetEvent('ps-adminmenu:server:BanPlayer', function(data, selectedData)
     local data = CheckDataFromKey(data)
     if not data or not CheckPerms(source, data.perms) then return end
 
-    local player = selectedData["Player"].value
-    local reason = selectedData["Reason"].value or ""
-    local time = selectedData["Duration"].value
+    local player = tonumber(selectedData["Player"] and selectedData["Player"].value)
+    local reason = (selectedData["Reason"] and selectedData["Reason"].value) or ""
+    local time = tonumber(selectedData["Duration"] and selectedData["Duration"].value)
+
+    if not player then
+        QBCore.Functions.Notify(source, locale("not_online"), 'error', 7500)
+        return
+    end
+
+    if not time then
+        QBCore.Functions.Notify(source, locale("empty_input"), 'error', 7500)
+        return
+    end
 
     local banTime = tonumber(os.time() + time)
+    local expire = banTime
+
+    if time == 2147483647 or banTime > 2147483647 then
+        expire = 2147483647
+    end
+
     local timeTable = os.date('*t', banTime)
 
-    MySQL.insert('INSERT INTO bans (name, license, discord, ip, reason, expire, bannedby) VALUES (?, ?, ?, ?, ?, ?, ?)',
-        { GetPlayerName(player), QBCore.Functions.GetIdentifier(player, 'license'), QBCore.Functions.GetIdentifier(
-            player, 'discord'), QBCore.Functions.GetIdentifier(player, 'ip'), reason, banTime, GetPlayerName(source) })
+    local insertId = MySQL.insert.await(
+        'INSERT INTO bans (name, license, discord, ip, reason, expire, bannedby) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        {
+            GetPlayerName(player),
+            QBCore.Functions.GetIdentifier(player, 'license'),
+            QBCore.Functions.GetIdentifier(player, 'discord'),
+            QBCore.Functions.GetIdentifier(player, 'ip'),
+            reason,
+            expire,
+            GetPlayerName(source)
+        }
+    )
+
+    if not insertId then
+        QBCore.Functions.Notify(source, "Ban failed: database insert error (check oxmysql and bans table).", 'error', 7500)
+        return
+    end
 
     if time == 2147483647 then
         DropPlayer(player, locale("banned") .. '\n' .. locale("reason") .. reason .. locale("ban_perm"))
@@ -28,7 +58,9 @@ RegisterNetEvent('ps-adminmenu:server:BanPlayer', function(data, selectedData)
             '/' .. timeTable['month'] .. '/' .. timeTable['year'] .. ' ' .. timeTable['hour'] .. ':' .. timeTable['min'])
     end
 
-    QBCore.Functions.Notify(source, locale("playerbanned", player, banTime, reason), 'success', 7500)
+    if source and GetPlayerName(source) then
+        QBCore.Functions.Notify(source, locale("playerbanned", player, banTime, reason), 'success', 7500)
+    end
 end)
 
 -- Warn Player
@@ -165,16 +197,7 @@ RegisterNetEvent('ps-adminmenu:server:GiveMoney', function(data, selectedData)
         return QBCore.Functions.Notify(src, locale("not_online"), 'error', 7500)
     end
 
-    amount = tonumber(amount)
-    moneyType = tostring(moneyType)
-    if not amount or amount <= 0 or amount > 10000000 then
-        return QBCore.Functions.Notify(src, locale("invalid_amount"), 'error', 7500)
-    end
-    if not Player.PlayerData.money[moneyType] then
-        return QBCore.Functions.Notify(src, locale("invalid_money_type"), 'error', 7500)
-    end
-
-    Player.Functions.AddMoney(moneyType, amount)
+    Player.Functions.AddMoney(tostring(moneyType), tonumber(amount))
     QBCore.Functions.Notify(src,
         locale((moneyType == "crypto" and "give_money_crypto" or "give_money"), tonumber(amount),
             Player.PlayerData.charinfo.firstname .. " " .. Player.PlayerData.charinfo.lastname), "success")
@@ -189,20 +212,12 @@ RegisterNetEvent('ps-adminmenu:server:GiveMoneyAll', function(data, selectedData
     local amount, moneyType = selectedData["Amount"].value, selectedData["Type"].value
     local players = QBCore.Functions.GetPlayers()
 
-    amount = tonumber(amount)
-    moneyType = tostring(moneyType)
-    if not amount or amount <= 0 or amount > 10000000 then
-        return QBCore.Functions.Notify(src, locale("invalid_amount"), 'error', 7500)
-    end
-
     for _, v in pairs(players) do
         local Player = QBCore.Functions.GetPlayer(tonumber(v))
-        if Player and Player.PlayerData.money[moneyType] then
-            Player.Functions.AddMoney(moneyType, amount)
-        end
+        Player.Functions.AddMoney(tostring(moneyType), tonumber(amount))
+        QBCore.Functions.Notify(src,
+            locale((moneyType == "crypto" and "give_money_all_crypto" or "give_money_all"), tonumber(amount)), "success")
     end
-    QBCore.Functions.Notify(src,
-        locale((moneyType == "crypto" and "give_money_all_crypto" or "give_money_all"), amount), "success")
 end)
 
 -- Take Money
@@ -219,20 +234,10 @@ RegisterNetEvent('ps-adminmenu:server:TakeMoney', function(data, selectedData)
         return QBCore.Functions.Notify(src, locale("not_online"), 'error', 7500)
     end
 
-    amount = tonumber(amount)
-    moneyType = tostring(moneyType)
-    if not amount or amount <= 0 or amount > 10000000 then
-        return QBCore.Functions.Notify(src, locale("invalid_amount"), 'error', 7500)
-    end
-    if not Player.PlayerData.money[moneyType] then
-        return QBCore.Functions.Notify(src, locale("invalid_money_type"), 'error', 7500)
-    end
-
-    if Player.PlayerData.money[moneyType] >= amount then
-        Player.Functions.RemoveMoney(moneyType, amount, "state-fees")
+    if Player.PlayerData.money[moneyType] >= tonumber(amount) then
+        Player.Functions.RemoveMoney(moneyType, tonumber(amount), "state-fees")
     else
         QBCore.Functions.Notify(src, locale("not_enough_money"), "primary")
-        return
     end
 
     QBCore.Functions.Notify(src,

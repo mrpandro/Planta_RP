@@ -4,17 +4,7 @@ lua54 'yes'
 use_experimental_fxv2_oal 'yes'
 author 'Kakarot'
 description 'Various small code snippets compiled into one resource for ease of use'
-version '1.4.0'
-
-
-dependencies {
-    'qb-core',
-    'qb-fuel',
-    'qb-inventory',
-    'qb-menu',
-    'qb-policejob',
-    'qb-target',
-}
+version '1.5.0'
 
 shared_scripts {
     '@qb-core/shared/locale.lua',

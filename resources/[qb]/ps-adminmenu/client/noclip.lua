@@ -188,21 +188,18 @@ local function ToggleNoclip()
         SetupCam()
         ToggleBehavior(true)
         while noclip do
-            Wait(1)
-            if not noclip then break end
+            Wait(0)
             UpdateCameraRotation()
             DisabledControls()
             UpdateSpeed()
             UpdateMovement()
         end
-        StopNoclip()
     else
         StopNoclip()
     end
 end
 
 RegisterNetEvent('ps-adminmenu:client:ToggleNoClip', function()
-    if not CheckPerms(Config.Actions["noclip"].perms) then return end
     ToggleNoclip()
 end)
 

@@ -16,9 +16,6 @@ end)
 
 -- Teleport to coords
 RegisterNetEvent('ps-adminmenu:client:TeleportToCoords', function(data, selectedData)
-    local data = CheckDataFromKey(data)
-    if not data or not CheckPerms(data.perms) then return end
-
     local coordsStr = selectedData["Coords"].value
     local x, y, z, heading
 
@@ -44,8 +41,6 @@ end)
 
 -- Teleport to Locaton
 RegisterNetEvent('ps-adminmenu:client:TeleportToLocation', function(data, selectedData)
-    local data = CheckDataFromKey(data)
-    if not data or not CheckPerms(data.perms) then return end
     local coords = selectedData["Location"].value
 
     lastCoords = GetEntityCoords(cache.ped)
@@ -54,9 +49,6 @@ end)
 
 -- Teleport back
 RegisterNetEvent('ps-adminmenu:client:TeleportBack', function(data)
-    local data = CheckDataFromKey(data)
-    if not data or not CheckPerms(data.perms) then return end
-
     if lastCoords then
         local coords = GetEntityCoords(cache.ped)
         teleport(lastCoords.x, lastCoords.y, lastCoords.z)

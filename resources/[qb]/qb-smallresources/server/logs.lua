@@ -1,5 +1,3 @@
-
-
 local Webhooks = {
     ['default'] = '',
     ['testwebhook'] = '',
@@ -41,65 +39,6 @@ local Webhooks = {
     ['qbjobs'] = '',
 }
 
--- Log category routing using server.cfg convars.
--- Priority order:
--- 1) DISCORD_WEBHOOK_LOG_<LOGNAME>
--- 2) DISCORD_WEBHOOK_<CATEGORY>
--- 3) DISCORD_WEBHOOK_DEFAULT
--- 4) Static values from this file (legacy fallback)
-local LogCategoryByName = {
-    ['anticheat'] = 'SECURITY',
-    ['bans'] = 'SECURITY',
-    ['death'] = 'SECURITY',
-    ['joinleave'] = 'PLAYER_EVENTS',
-    ['ooc'] = 'PLAYER_EVENTS',
-    ['report'] = 'ADMIN',
-    ['playermoney'] = 'ECONOMY',
-    ['banking'] = 'ECONOMY',
-    ['playerinventory'] = 'ECONOMY',
-    ['vehicleshop'] = 'ECONOMY',
-    ['bossmenu'] = 'ADMIN',
-    ['house'] = 'RP_EVENTS',
-    ['storerobbery'] = 'RP_EVENTS',
-    ['bankrobbery'] = 'RP_EVENTS',
-    ['qbjobs'] = 'RP_EVENTS',
-    ['ps-adminmenu'] = 'ADMIN',
-}
-
-local function getWebhookConvar(name)
-    return GetConvar(name, '')
-end
-
-local function buildSpecificLogConvar(logName)
-    return 'DISCORD_WEBHOOK_LOG_' .. string.upper((logName or 'default'):gsub('[^%w]', '_'))
-end
-
-local function resolveWebhook(logName)
-    local specificWebhook = getWebhookConvar(buildSpecificLogConvar(logName))
-    if specificWebhook ~= '' then
-        return specificWebhook
-    end
-
-    local category = LogCategoryByName[logName]
-    if category then
-        local categoryWebhook = getWebhookConvar('DISCORD_WEBHOOK_' .. category)
-        if categoryWebhook ~= '' then
-            return categoryWebhook
-        end
-    end
-
-    local defaultWebhook = getWebhookConvar('DISCORD_WEBHOOK_DEFAULT')
-    if defaultWebhook ~= '' then
-        return defaultWebhook
-    end
-
-    if Webhooks[logName] and Webhooks[logName] ~= '' then
-        return Webhooks[logName]
-    end
-
-    return Webhooks['default'] or ''
-end
-
 local colors = { -- https://www.spycolor.com/
     ['default'] = 14423100,
     ['blue'] = 255,
@@ -114,120 +53,37 @@ local colors = { -- https://www.spycolor.com/
 }
 
 local logQueue = {}
-local BrandName = GetConvar('DISCORD_LOGS_BRAND_NAME', 'Planta RP Logs')
-local BrandIconUrl = GetConvar('DISCORD_LOGS_ICON_URL', '')
-
-local function buildBrandAuthor()
-    local author = {
-        ['name'] = BrandName,
-    }
-
-    if BrandIconUrl ~= '' then
-        author['icon_url'] = BrandIconUrl
-    end
-
-    return author
-end
-
-local function truncateForDiscord(value, maxLength)
-    local text = tostring(value or '')
-    if #text <= maxLength then
-        return text
-    end
-
-    return text:sub(1, maxLength - 3) .. '...'
-end
-
-local function buildPsAdminmenuEmbed(title, message)
-    local actionFromTitle = title and title:match('^Action Used:%s*(.+)$')
-
-    local adminName, citizenId, usedAction, args = message:match('^(.-) %((.-)%) %- Used: ([^ ]+)%s+with args:%s*(.+)$')
-    if not adminName then
-        adminName, citizenId, usedAction = message:match('^(.-) %((.-)%) %- Used: ([^ ]+)$')
-    end
-
-    local action = actionFromTitle or usedAction or 'unknown'
-    local safeAdminName = truncateForDiscord(adminName or 'unknown', 256)
-    local safeCitizenId = truncateForDiscord(citizenId or 'unknown', 256)
-    local safeAction = truncateForDiscord(action, 256)
-    local safeArgs = args and ('```json\n' .. truncateForDiscord(args, 950) .. '\n```') or 'Sem argumentos'
-
-    return {
-        ['title'] = 'Painel Admin | Acao executada',
-        ['color'] = colors['orange'],
-        ['footer'] = {
-            ['text'] = os.date('%d/%m/%Y %H:%M:%S'),
-        },
-        ['description'] = 'Uma acao foi executada via ps-adminmenu.',
-        ['author'] = buildBrandAuthor(),
-        ['fields'] = {
-            {
-                ['name'] = 'Acao',
-                ['value'] = safeAction,
-                ['inline'] = true,
-            },
-            {
-                ['name'] = 'Admin',
-                ['value'] = safeAdminName,
-                ['inline'] = true,
-            },
-            {
-                ['name'] = 'CitizenID',
-                ['value'] = safeCitizenId,
-                ['inline'] = true,
-            },
-            {
-                ['name'] = 'Argumentos',
-                ['value'] = safeArgs,
-                ['inline'] = false,
-            }
-        }
-    }
-end
-
-local function buildEmbed(name, title, color, message, imageUrl)
-    if name == 'ps-adminmenu' and title and title:find('Action Used:', 1, true) == 1 then
-        return buildPsAdminmenuEmbed(title, message)
-    end
-
-    return {
-        ['title'] = title,
-        ['color'] = colors[color] or colors['default'],
-        ['footer'] = {
-            ['text'] = os.date('%c'),
-        },
-        ['description'] = message,
-        ['author'] = buildBrandAuthor(),
-        ['image'] = imageUrl and imageUrl ~= '' and { ['url'] = imageUrl } or nil,
-    }
-end
 
 RegisterNetEvent('qb-log:server:CreateLog', function(name, title, color, message, tagEveryone, imageUrl)
     local tag = tagEveryone or false
 
     if Config.Logging == 'discord' then
         if not Webhooks[name] then
-            Webhooks[name] = ''
-        end
-
-        local webHook = resolveWebhook(name)
-        if webHook == '' then
-            print('No Discord webhook configured for log: ' .. tostring(name))
+            print('Tried to call a log that isn\'t configured with the name of ' .. name)
             return
         end
-
+        local webHook = Webhooks[name] ~= '' and Webhooks[name] or Webhooks['default']
         local embedData = {
-            buildEmbed(name, title, color, message, imageUrl)
+            {
+                ['title'] = title,
+                ['color'] = colors[color] or colors['default'],
+                ['footer'] = {
+                    ['text'] = os.date('%c'),
+                },
+                ['description'] = message,
+                ['author'] = {
+                    ['name'] = 'QBCore Logs',
+                    ['icon_url'] = 'https://raw.githubusercontent.com/GhzGarage/qb-media-kit/main/Display%20Pictures/Logo%20-%20Display%20Picture%20-%20Stylized%20-%20Red.png',
+                },
+                ['image'] = imageUrl and imageUrl ~= '' and { ['url'] = imageUrl } or nil,
+            }
         }
 
         if not logQueue[name] then logQueue[name] = {} end
         logQueue[name][#logQueue[name] + 1] = { webhook = webHook, data = embedData }
 
         if #logQueue[name] >= 10 then
-            local postData = { username = BrandName, embeds = {} }
-            if BrandIconUrl ~= '' then
-                postData.avatar_url = BrandIconUrl
-            end
+            local postData = { username = 'QB Logs', embeds = {} }
 
             if tag then
                 postData.content = '@everyone'
@@ -273,10 +129,7 @@ Citizen.CreateThread(function()
             timer = 0
             for name, queue in pairs(logQueue) do
                 if #queue > 0 then
-                    local postData = { username = BrandName, embeds = {} }
-                    if BrandIconUrl ~= '' then
-                        postData.avatar_url = BrandIconUrl
-                    end
+                    local postData = { username = 'QB Logs', embeds = {} }
                     for i = 1, #queue do
                         postData.embeds[#postData.embeds + 1] = queue[i].data[1]
                     end

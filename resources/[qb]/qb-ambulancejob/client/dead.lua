@@ -19,10 +19,8 @@ function OnDeath()
         TriggerServerEvent('InteractSound_SV:PlayOnSource', 'demo', 0.1)
         local player = PlayerPedId()
 
-        local speedTimeout = 0
-        while (GetEntitySpeed(player) > 0.5 or IsPedRagdoll(player)) and speedTimeout < 150 do
+        while GetEntitySpeed(player) > 0.5 or IsPedRagdoll(player) do
             Wait(10)
-            speedTimeout = speedTimeout + 1
         end
 
         if isDead then
@@ -60,11 +58,9 @@ end
 
 function DeathTimer()
     hold = 5
-    local deathLoopTimeout = 0
-    while isDead and deathLoopTimeout < 600 do
+    while isDead do
         Wait(1000)
         deathTime = deathTime - 1
-        deathLoopTimeout = deathLoopTimeout + 1
         if deathTime <= 0 then
             if IsControlPressed(0, 38) and hold <= 0 and not isInHospitalBed then
                 TriggerEvent('hospital:client:RespawnAtHospital')

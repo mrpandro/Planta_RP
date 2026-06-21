@@ -5,12 +5,6 @@ author 'Kakarot'
 description 'Manages all weapon logic for ammo, attachments, and more'
 version '1.2.1'
 
-
-dependencies {
-    'qb-core',
-    'qb-inventory',
-}
-
 shared_scripts {
     '@qb-core/shared/locale.lua',
     'locales/en.lua',
@@ -22,8 +16,6 @@ client_scripts {
     'client/main.lua',
     'client/recoil.lua',
     'client/weapdraw.lua',
-    'client/aiming_logic.lua',
-    'client/aiming.lua',
 }
 
 server_script 'server/main.lua'
