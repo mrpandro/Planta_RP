@@ -59,6 +59,7 @@ server_scripts {
     'server/event_bus.lua',
     'server/api.lua',
     'server/nui_api.lua',
+    'server/repairkit.lua',
     'server/scheduler_tick.lua',
 }
 
@@ -67,6 +68,7 @@ client_scripts {
     'client/placement.lua',
     'client/interaction.lua',
     'client/nui.lua',
+    'client/repairkit.lua',
     'client/streaming.lua',
 }
 

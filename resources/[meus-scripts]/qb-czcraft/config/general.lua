@@ -17,7 +17,7 @@ CZCraft.Config.General = {
         production = true,
         scheduler = true,
         nui = true,
-        repairkit = false,
+        repairkit = true,
         admin = false,
     },
 
