@@ -9,4 +9,12 @@ exclude = {
     "tests",
     "cache",
     "%.git",
+    -- FiveM-native-dependent files cannot be exercised in pure Lua tests.
+    -- Coverage is tracked for pure domain/shared/config modules only.
+    "resources/.*%/server/adapters/",
+    "resources/.*%/server/repositories/",
+    "resources/.*%/server/api%.lua",
+    "resources/.*%/server/event_bus%.lua",
+    "resources/.*%/server/bootstrap%.lua",
+    "resources/.*%/client/",
 }

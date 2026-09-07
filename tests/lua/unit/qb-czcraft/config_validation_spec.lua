@@ -606,17 +606,19 @@ return {
         end,
     },
     {
-        name = "baseline: only placement flag is enabled in checked-in config",
+        name = "baseline: placement/bills/production/scheduler flags enabled in checked-in config",
         test = function()
             local features = CZCraft.Config.General.features
-            -- placement is enabled once Part 1 (machine lifecycle) lands.
+            -- Part 1: placement; Part 3: bills, production, scheduler.
             assertEqual(features.placement, true, "placement should be enabled")
-            -- All other gameplay flags remain disabled until their parts land.
-            for flag, value in pairs(features) do
-                if flag ~= 'placement' then
-                    assertEqual(value, false, "feature flag " .. flag .. " should be disabled")
-                end
-            end
+            assertEqual(features.bills, true, "bills should be enabled")
+            assertEqual(features.production, true, "production should be enabled")
+            assertEqual(features.scheduler, true, "scheduler should be enabled")
+            -- Remaining flags stay disabled until their parts land.
+            assertEqual(features.storageTransfers, false, "storageTransfers disabled")
+            assertEqual(features.nui, false, "nui disabled")
+            assertEqual(features.repairkit, false, "repairkit disabled")
+            assertEqual(features.admin, false, "admin disabled")
         end,
     },
     {
