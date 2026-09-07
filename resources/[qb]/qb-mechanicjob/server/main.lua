@@ -311,11 +311,14 @@ QBCore.Functions.CreateUseableItem('tirerepairkit', function(source)
     TriggerClientEvent('qb-mechanicjob:client:repairTire', source)
 end)
 
-QBCore.Functions.CreateUseableItem('repairkit', function(source)
-    local Player = exports['qb-core']:GetPlayer(source)
-    if not Player then return end
-    TriggerClientEvent('qb-mechanicjob:client:repairVehicle', source)
-end)
+-- Disabled: repairkit is now handled by qb-czcraft (server-authoritative).
+-- Keeping this active caused a double-handler conflict with qb-czcraft's
+-- QBCore:Client:UseItem hook. advancedrepairkit and tirerepairkit remain here.
+-- QBCore.Functions.CreateUseableItem('repairkit', function(source)
+--     local Player = exports['qb-core']:GetPlayer(source)
+--     if not Player then return end
+--     TriggerClientEvent('qb-mechanicjob:client:repairVehicle', source)
+-- end)
 
 QBCore.Functions.CreateUseableItem('advancedrepairkit', function(source)
     local Player = exports['qb-core']:GetPlayer(source)

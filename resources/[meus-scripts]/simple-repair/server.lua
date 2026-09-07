@@ -6,13 +6,15 @@ local Config = {
     ConsumirItem = true 
 }
 
--- 1. O GATILHO: Quando o jogador clica "USAR"
-QBCore.Functions.CreateUseableItem(Config.ItemNecessario, function(source, item)
-    local Player = QBCore.Functions.GetPlayer(source)
-    if not Player then return end
-
-    TriggerClientEvent('simple-repair:client:VerificarCarro', source)
-end)
+-- Disabled: repairkit is now handled by qb-czcraft (server-authoritative).
+-- Keeping this active caused a double-handler conflict with qb-czcraft's
+-- QBCore:Client:UseItem hook.
+-- QBCore.Functions.CreateUseableItem(Config.ItemNecessario, function(source, item)
+--     local Player = QBCore.Functions.GetPlayer(source)
+--     if not Player then return end
+--
+--     TriggerClientEvent('simple-repair:client:VerificarCarro', source)
+-- end)
 
 -- 2. FINALIZAR: Remover o item e aplicar reparação
 RegisterNetEvent('simple-repair:server:CobrarEFinalizar')
