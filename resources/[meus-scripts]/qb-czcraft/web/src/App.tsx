@@ -16,7 +16,7 @@ import type {
   StockRow,
 } from './types';
 
-interface AppState {
+export interface AppState {
   page: PageId;
   machineUuid: string | null;
   loading: boolean;
@@ -28,7 +28,7 @@ interface AppState {
   overview: OwnerOverview | null;
 }
 
-type AppAction =
+export type AppAction =
   | { type: 'SET_PAGE'; page: PageId }
   | { type: 'SET_MACHINE'; machineUuid: string | null }
   | { type: 'SET_LOADING'; loading: boolean }
@@ -39,7 +39,7 @@ type AppAction =
   | { type: 'SET_RECIPES'; recipes: Recipe[] }
   | { type: 'SET_OVERVIEW'; overview: OwnerOverview | null };
 
-const initialState: AppState = {
+export const initialState: AppState = {
   page: 'overview',
   machineUuid: null,
   loading: false,
@@ -51,7 +51,7 @@ const initialState: AppState = {
   overview: null,
 };
 
-function reducer(state: AppState, action: AppAction): AppState {
+export function reducer(state: AppState, action: AppAction): AppState {
   switch (action.type) {
     case 'SET_PAGE':
       return { ...state, page: action.page };
