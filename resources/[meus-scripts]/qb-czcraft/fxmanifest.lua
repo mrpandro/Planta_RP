@@ -30,6 +30,7 @@ shared_scripts {
     'config/plots.lua',
     'config/recipes.lua',
     'shared/recipe_catalog.lua',
+    'shared/recipe_snapshot.lua',
     'shared/validation.lua',
 }
 
