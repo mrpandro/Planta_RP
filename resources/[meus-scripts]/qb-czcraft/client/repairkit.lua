@@ -1,7 +1,8 @@
 -- qb-czcraft repairkit client handler
 -- When the player uses a repairkit item, checks for a nearby vehicle, starts a
--- progress bar, then asks the server to validate+consume+confirm. The actual
--- vehicle repair is applied on the client only after the server confirms.
+-- progress bar, then asks the server to validate+consume+repair. The server
+-- applies the mechanical repair to the vehicle entity before sending the
+-- success event; the client only plays a sound and shows a notification.
 
 local CZCraftClient = _G.CZCraftClient
 
@@ -27,31 +28,13 @@ local function findNearbyVehicle()
     return vehicle, netId
 end
 
--- Applies the repair to the vehicle (client-side visual fix).
+-- Applies cosmetic finishing touches to the vehicle. The mechanical repair
+-- (engine, body, petrol tank, wheels, windows) is applied SERVER-SIDE before
+-- the success event is sent. This function only handles dirt removal and the
+-- repair sound — non-critical cosmetics that are safe to skip if the event
+-- is lost.
 -- @param vehicleEntity number
 local function applyRepair(vehicleEntity)
-    -- Fix engine health.
-    SetVehicleEngineHealth(vehicleEntity, 1000.0)
-    -- Fix body health.
-    SetVehicleBodyHealth(vehicleEntity, 1000.0)
-    -- Fix petrol tank.
-    SetVehiclePetrolTankHealth(vehicleEntity, 1000.0)
-    -- Fix all wheels.
-    local wheelCount = GetVehicleNumberOfWheels(vehicleEntity)
-    for i = 0, wheelCount - 1 do
-        SetVehicleWheelHealth(vehicleEntity, i, 1000.0)
-        -- Remove any wheel burst state.
-        SetVehicleTyreBurst(vehicleEntity, i, false, false)
-    end
-    -- Fix windows.
-    FixVehicleWindow(vehicleEntity, 0)
-    FixVehicleWindow(vehicleEntity, 1)
-    FixVehicleWindow(vehicleEntity, 2)
-    FixVehicleWindow(vehicleEntity, 3)
-    FixVehicleWindow(vehicleEntity, 4)
-    FixVehicleWindow(vehicleEntity, 5)
-    FixVehicleWindow(vehicleEntity, 6)
-    FixVehicleWindow(vehicleEntity, 7)
     -- Remove dirt.
     SetVehicleDirtLevel(vehicleEntity, 0.0)
     -- Play the repair sound.
@@ -156,7 +139,8 @@ AddEventHandler('qb-czcraft:client:repairkit:progress', function(data)
     end
 end)
 
--- Server says: repair succeeded, apply the fix.
+-- Server says: repair succeeded (mechanical repair already applied server-side).
+-- The client only applies cosmetic finishing touches (dirt + sound).
 RegisterNetEvent('qb-czcraft:client:repairkit:success')
 AddEventHandler('qb-czcraft:client:repairkit:success', function(data)
     repairInProgress = false

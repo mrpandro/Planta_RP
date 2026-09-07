@@ -1,12 +1,13 @@
 -- qb-czcraft repairkit server handler
 -- Server-authoritative repairkit: the client shows a progress bar, then the
--- server revalidates entity/distance/item before consuming the item and
--- confirming the repair. The client never applies the repair itself.
+-- server revalidates entity/distance/item, consumes the item, and applies the
+-- repair to the vehicle entity SERVER-SIDE before notifying the client.
 --
 -- Security: every step revalidates source, vehicle entity, distance, item
 -- presence, and rate limit. Duplicate requests within the cooldown are rejected.
--- Consumption happens BEFORE the repair confirmation is sent, so a crash between
--- the two leaves the item consumed but the vehicle unrepaired (safe failure mode).
+-- The repair is applied server-side BEFORE the success event is sent, so a
+-- connection drop between the two leaves the vehicle repaired and the item
+-- consumed — no player-side data loss window.
 
 CZCraft = CZCraft or {}
 
@@ -87,6 +88,22 @@ local function validateVehicle(source, vehicleNet)
     return true, nil
 end
 
+-- Applies the mechanical repair to the vehicle entity server-side.
+-- This runs BEFORE the success event is sent, so even if the client never
+-- receives the event (connection drop), the vehicle is already repaired.
+-- @param vehicleEntity number
+local function applyServerSideRepair(vehicleEntity)
+    SetVehicleFixed(vehicleEntity)
+    SetVehicleEngineHealth(vehicleEntity, 1000.0)
+    SetVehicleBodyHealth(vehicleEntity, 1000.0)
+    SetVehiclePetrolTankHealth(vehicleEntity, 1000.0)
+    local wheelCount = GetVehicleNumberOfWheels(vehicleEntity)
+    for i = 0, wheelCount - 1 do
+        SetVehicleWheelHealth(vehicleEntity, i, 1000.0)
+        SetVehicleTyreBurst(vehicleEntity, i, false, false)
+    end
+end
+
 -- ===========================================================================
 -- Repair flow:
 -- 1. Client uses repairkit item -> QBCore:Client:UseItem -> client/repairkit.lua
@@ -95,7 +112,8 @@ end
 -- 4. Server validates entity/distance/item, creates a session with a nonce
 -- 5. Client shows progress bar for PROGRESS_DURATION_MS
 -- 6. Client sends 'qb-czcraft:server:repairkit:complete' with nonce
--- 7. Server revalidates everything, consumes the item, then confirms repair
+-- 7. Server revalidates everything, consumes the item, applies the repair
+--    server-side, then sends success (cosmetic notification only)
 -- ===========================================================================
 
 -- Step 1: Start — validate and create a session.
@@ -219,7 +237,7 @@ AddEventHandler('qb-czcraft:server:repairkit:complete', function(data)
         return
     end
 
-    -- Consume the item BEFORE confirming the repair (safe failure mode).
+    -- Consume the item.
     local Player = QBCore.Functions.GetPlayer(src)
     if not Player then
         activeSessions[src] = nil
@@ -237,10 +255,19 @@ AddEventHandler('qb-czcraft:server:repairkit:complete', function(data)
     -- Trigger the item box animation on the client.
     TriggerClientEvent('inventory:client:ItemBox', src, QBCore.Shared.Items[REPAIRKIT_ITEM], 'remove')
 
+    -- Apply the repair SERVER-SIDE before notifying the client. This eliminates
+    -- the item-loss window: if the success event never reaches the client
+    -- (connection drop), the vehicle is already repaired and the item is consumed.
+    local vehicleEntity = NetworkGetEntityFromNetworkId(session.vehicleNet)
+    if vehicleEntity and vehicleEntity ~= 0 and DoesEntityExist(vehicleEntity) then
+        applyServerSideRepair(vehicleEntity)
+    end
+
     -- Clear the session.
     activeSessions[src] = nil
 
-    -- Confirm the repair to the client — the client applies the actual vehicle fix.
+    -- Notify the client — cosmetic only (sound + notification). The repair is
+    -- already applied server-side.
     TriggerClientEvent('qb-czcraft:client:repairkit:success', src, {
         vehicleNet = session.vehicleNet,
         nonce = data.nonce,
