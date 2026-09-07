@@ -1,4 +1,4 @@
--- qb-czraft client placement
+-- qb-czcraft client placement
 -- Ghost prop + raycast + rotate (scroll) + cancel (ESC) placement flow.
 -- On confirm, sends the transform to the server via lib.callback.await.
 -- The server is authoritative: the client only proposes a transform; the

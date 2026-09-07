@@ -606,17 +606,17 @@ return {
         end,
     },
     {
-        name = "baseline: placement/bills/production/scheduler flags enabled in checked-in config",
+        name = "baseline: placement/bills/production/scheduler/nui flags enabled in checked-in config",
         test = function()
             local features = CZCraft.Config.General.features
-            -- Part 1: placement; Part 3: bills, production, scheduler.
+            -- Part 1: placement; Part 3: bills, production, scheduler; NUI task 5.
             assertEqual(features.placement, true, "placement should be enabled")
             assertEqual(features.bills, true, "bills should be enabled")
             assertEqual(features.production, true, "production should be enabled")
             assertEqual(features.scheduler, true, "scheduler should be enabled")
+            assertEqual(features.nui, true, "nui should be enabled")
             -- Remaining flags stay disabled until their parts land.
             assertEqual(features.storageTransfers, false, "storageTransfers disabled")
-            assertEqual(features.nui, false, "nui disabled")
             assertEqual(features.repairkit, false, "repairkit disabled")
             assertEqual(features.admin, false, "admin disabled")
         end,

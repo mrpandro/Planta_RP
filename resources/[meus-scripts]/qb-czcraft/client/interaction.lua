@@ -38,11 +38,10 @@ local function addTarget(machineUuid, entity, machineType)
     })
 end
 
--- Handles the open-dashboard event (NUI is a separate v0.1 task; for now this
--- is a placeholder that notifies).
+-- Handles the open-dashboard event (opens the NUI dashboard).
 RegisterNetEvent('qb-czcraft:client:openDashboard', function(data)
     if not data or not data.machineUuid then return end
-    CZCraftClient.QBCore.Functions.Notify('Machine dashboard (NUI) coming soon: ' .. data.machineUuid, 'primary')
+    CZCraftClient.NUI.open(data.machineUuid, data.machineType)
 end)
 
 -- Handles the pickup prompt event.

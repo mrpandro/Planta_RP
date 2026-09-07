@@ -58,6 +58,7 @@ server_scripts {
     'server/repositories/cycles.lua',
     'server/event_bus.lua',
     'server/api.lua',
+    'server/nui_api.lua',
     'server/scheduler_tick.lua',
 }
 
@@ -65,5 +66,15 @@ client_scripts {
     'client/main.lua',
     'client/placement.lua',
     'client/interaction.lua',
+    'client/nui.lua',
     'client/streaming.lua',
+}
+
+-- NUI (local dashboard)
+ui_page 'web/dist/index.html'
+
+files {
+    'web/dist/index.html',
+    'web/dist/assets/*.js',
+    'web/dist/assets/*.css',
 }

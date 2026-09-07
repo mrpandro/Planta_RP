@@ -16,7 +16,7 @@ CZCraft.Config.General = {
         bills = true,
         production = true,
         scheduler = true,
-        nui = false,
+        nui = true,
         repairkit = false,
         admin = false,
     },
