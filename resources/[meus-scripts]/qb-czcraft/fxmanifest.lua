@@ -53,8 +53,12 @@ server_scripts {
     'server/repositories/machines.lua',
     'server/repositories/operations.lua',
     'server/repositories/audit.lua',
+    'server/repositories/stock.lua',
+    'server/repositories/bills.lua',
+    'server/repositories/cycles.lua',
     'server/event_bus.lua',
     'server/api.lua',
+    'server/scheduler_tick.lua',
 }
 
 client_scripts {
