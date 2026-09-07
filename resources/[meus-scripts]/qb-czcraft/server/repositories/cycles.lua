@@ -138,9 +138,14 @@ function CyclesRepo.start(params)
 end
 
 -- Completes a cycle: moves reserved output to actual stock, deletes the active
--- cycle row, and inserts a production event. Idempotent: if the cycle_id
--- already has a production event (unique idempotency_key), the transaction
--- is a no-op.
+-- cycle row, and inserts a production event. Idempotent: the production-event
+-- INSERT uses ON DUPLICATE KEY UPDATE on the unique idempotency_key. When the
+-- event already exists (replay), MySQL returns affected = 0 and ALL side
+-- effects (stock deltas, cycle delete, machine update) are skipped — the
+-- transaction commits as a no-op and the cached/prior result is returned.
+-- This guard is in the repository, not the caller: side effects are gated on
+-- the dedup-key write's affected count, not on caller discipline or column-type
+-- side effects.
 -- @param params table {
 --   cycle_id, machine_uuid, bill_id?, completion_deltas = { { item_name, quantity_delta, reserved_delta } },
 --   idempotency_key, cycles_completed = 1, inputs_json, outputs_json, cost, started_at, ended_at,
@@ -224,8 +229,18 @@ function CyclesRepo.complete(params)
 
     local ok, err = pcall(function()
         MySQL.transaction.await(function()
-            -- 1. Insert the production event (idempotent).
-            MySQL.update(insertEventStatement, insertEventArgs)
+            -- 1. Insert the production event (idempotent via unique idempotency_key).
+            --    ON DUPLICATE KEY UPDATE event_id = event_id makes this a no-op on
+            --    replay: MySQL returns affected = 0 when the row already exists and
+            --    the UPDATE changes nothing. We gate ALL side effects on that count
+            --    so a replayed complete() is a committed no-op, not a double-produce.
+            local eventAffected = MySQL.update(insertEventStatement, insertEventArgs)
+            if eventAffected == 0 then
+                -- Replay: the prior completion already applied stock deltas, deleted
+                -- the active cycle, and stopped the machine. Skip side effects and
+                -- return the cached/prior result (success).
+                return
+            end
             -- 2. Apply completion stock deltas.
             for i = 1, #deltaStatements do
                 MySQL.update(deltaStatements[i], deltaArgs[i])
