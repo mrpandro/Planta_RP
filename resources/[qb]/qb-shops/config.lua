@@ -56,6 +56,11 @@ Config.Products = {
         { name = 'fitbit',            price = 950, amount = 150 },
         { name = 'cleaningkit',       price = 380, amount = 150 },
         { name = 'advancedrepairkit', price = 1400, amount = 50, requiredJob = { 'mechanic', 'bennys', 'tuners' } },
+        -- qb-czcraft industrial machines
+        { name = 'cz_workbench_machine',  price = 5000,  amount = 10 },
+        { name = 'cz_refinery_machine',   price = 15000, amount = 5 },
+        { name = 'cz_fabricator_machine', price = 25000, amount = 5 },
+        { name = 'cz_assembly_machine',   price = 40000, amount = 3 },
     },
     ['weedshop'] = { -- Dispensário
         { name = 'joint',          price = 45,  amount = 50 },

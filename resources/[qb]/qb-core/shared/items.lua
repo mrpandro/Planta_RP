@@ -386,4 +386,20 @@ QBCore.Shared.Items = {
     item_bench = {name = "item_bench", label = "Workbench", weight = 15000, type = "item", image = "workbench.png", unique = true, useable = true, shouldClose = false, combinable = nil, description = "A workbench to craft items."},
     attachment_bench = {name = "attachment_bench", label = "Attachment Workbench", weight = 15000, type = "item", image = "attworkbench.png", unique = true, useable = true, shouldClose = false, combinable = nil, description = "A workbench for crafting attachments."},
 
+    -- qb-czcraft industrial components (placeholder images, to be replaced with validated assets)
+    cz_copper_wire              = { name = 'cz_copper_wire', label = 'Copper Wire', weight = 50, type = 'item', image = 'metalscrap.png', unique = false, useable = false, shouldClose = false, description = 'Drawn copper wire for industrial fabrication' },
+    cz_aluminum_sheet           = { name = 'cz_aluminum_sheet', label = 'Aluminum Sheet', weight = 200, type = 'item', image = 'metalscrap.png', unique = false, useable = false, shouldClose = false, description = 'Rolled aluminum sheet for industrial fabrication' },
+    cz_metal_parts              = { name = 'cz_metal_parts', label = 'Metal Parts', weight = 150, type = 'item', image = 'metalscrap.png', unique = false, useable = false, shouldClose = false, description = 'Fabricated metal parts from steel' },
+    cz_casing                   = { name = 'cz_casing', label = 'Casing', weight = 100, type = 'item', image = 'metalscrap.png', unique = false, useable = false, shouldClose = false, description = 'Aluminum and plastic casing for assembly' },
+    cz_electronics              = { name = 'cz_electronics', label = 'Electronics', weight = 80, type = 'item', image = 'metalscrap.png', unique = false, useable = false, shouldClose = false, description = 'Copper wire and plastic electronics module' },
+    cz_mechanical_parts         = { name = 'cz_mechanical_parts', label = 'Mechanical Parts', weight = 200, type = 'item', image = 'metalscrap.png', unique = false, useable = false, shouldClose = false, description = 'Mechanical parts from metal and rubber' },
+    cz_components               = { name = 'cz_components', label = 'Components', weight = 300, type = 'item', image = 'metalscrap.png', unique = false, useable = false, shouldClose = false, description = 'Assembled industrial components' },
+    cz_receiver                 = { name = 'cz_receiver', label = 'Receiver', weight = 500, type = 'item', image = 'metalscrap.png', unique = false, useable = false, shouldClose = false, description = 'Weapon receiver for assembly' },
+
+    -- qb-czcraft machines (unique=true, sold in hardware shops, placeholder images)
+    cz_workbench_machine        = { name = 'cz_workbench_machine', label = 'Workbench', weight = 10000, type = 'item', image = 'workbench.png', unique = true, useable = true, shouldClose = false, description = 'Industrial workbench for basic automatic operations' },
+    cz_refinery_machine         = { name = 'cz_refinery_machine', label = 'Refinery', weight = 20000, type = 'item', image = 'workbench.png', unique = true, useable = true, shouldClose = false, description = 'Industrial refinery for processing raw resources' },
+    cz_fabricator_machine       = { name = 'cz_fabricator_machine', label = 'Fabricator', weight = 20000, type = 'item', image = 'attworkbench.png', unique = true, useable = true, shouldClose = false, description = 'Industrial fabricator for producing intermediaries' },
+    cz_assembly_machine         = { name = 'cz_assembly_machine', label = 'Assembly Machine', weight = 30000, type = 'item', image = 'attworkbench.png', unique = true, useable = true, shouldClose = false, description = 'Industrial assembly machine for finals and ORG weapons' },
+
 }

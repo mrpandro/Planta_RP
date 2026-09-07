@@ -40,4 +40,11 @@ Config = {
         { name = 'kurkakola',    price = 4, amount = 50 },
         { name = 'water_bottle', price = 4, amount = 50 },
     },
+
+    -- Resources permitted to call the ApplyIdempotentBatch export. The batch
+    -- patch is the persistence path for czcraft deposit/withdraw sagas; only
+    -- qb-czcraft is allowed to invoke it.
+    CzCraftAllowedResources = {
+        ['qb-czcraft'] = true,
+    },
 }

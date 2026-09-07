@@ -21,6 +21,7 @@ client_scripts {
 server_scripts {
     '@oxmysql/lib/MySQL.lua',
     'server/main.lua',
+    'server/idempotent_batch.lua',
     'server/functions.lua',
     'server/commands.lua',
 }

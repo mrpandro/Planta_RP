@@ -1,5 +1,24 @@
 -- Local Functions
 
+-- Optimistic generation counter per player identifier. Bumped by every
+-- in-memory mutator (Add/Remove/Set/Clear) so ApplyIdempotentBatch can detect
+-- a concurrent sync mutation that ran while it awaited the journal tx, and
+-- re-snapshot/re-validate instead of silently overwriting it.
+local InventoryGeneration = {}
+
+-- Mutations whose in-memory swap already happened but whose tx_2 persist
+-- step failed. A same-session retry of such a mutation must retry ONLY the
+-- persist step (tx_2), never re-validate or re-swap — the in-memory state
+-- already reflects the batch, so re-validation would fail or double-apply.
+-- Cleared on successful persist. Cross-session retries are safe without
+-- this table because LoadInventory loads the original (un-persisted) DB
+-- inventory and the PENDING journal row triggers a clean re-application.
+local PersistPending = {}
+
+local function bumpGeneration(identifier)
+    InventoryGeneration[identifier] = (InventoryGeneration[identifier] or 0) + 1
+end
+
 local function InitializeInventory(inventoryId, data)
     Inventories[inventoryId] = {
         items = {},
@@ -141,6 +160,7 @@ function SetInventory(identifier, items, reason)
 
     if player then
         player.SetPlayerData('items', items)
+        bumpGeneration(identifier)
         if not player.Offline then
             local logMessage = string.format('**%s (citizenid: %s | id: %s)** items set: %s', GetPlayerName(identifier), player.PlayerData.citizenid, identifier, json.encode(items))
             TriggerEvent('qb-log:server:CreateLog', 'playerinventory', 'SetInventory', 'blue', logMessage)
@@ -442,6 +462,7 @@ function ClearInventory(source, filterItems)
         end
     end
     player.SetPlayerData('items', savedItemData)
+    bumpGeneration(source)
     if not player.Offline then
         local logMessage = string.format('**%s (citizenid: %s | id: %s)** inventory cleared', GetPlayerName(source), player.PlayerData.citizenid, source)
         TriggerEvent('qb-log:server:CreateLog', 'playerinventory', 'ClearInventory', 'red', logMessage)
@@ -771,6 +792,7 @@ function AddItem(identifier, item, amount, slot, info, reason)
     end
 
     if player then player.SetPlayerData('items', inventory) end
+    if player then bumpGeneration(identifier) end
     local invName = player and GetPlayerName(identifier) .. ' (' .. identifier .. ')' or identifier
     local addReason = reason or 'No reason specified'
     local resourceName = GetInvokingResource() or 'qb-inventory'
@@ -857,6 +879,7 @@ function RemoveItem(identifier, item, amount, slot, reason)
 
     if player then
         player.SetPlayerData('items', inventory)
+        bumpGeneration(identifier)
 
         local itemInfo = QBCore.Shared.Items[item:lower()]
         if itemInfo and itemInfo.type == 'weapon' and inventoryItem.amount <= 0 then
@@ -883,3 +906,198 @@ function RemoveItem(identifier, item, amount, slot, reason)
 end
 
 exports('RemoveItem', RemoveItem)
+
+-- Serializes an items table (keyed by slot) into the { name, amount, info, type,
+-- slot } array shape that SaveInventory writes, so a subsequent LoadInventory
+-- round-trips identically.
+local function serializeForSave(items)
+    local out = {}
+    for slot, item in pairs(items) do
+        if item then
+            out[#out + 1] = {
+                name = item.name,
+                amount = item.amount,
+                info = item.info,
+                type = item.type,
+                slot = slot,
+            }
+        end
+    end
+    return out
+end
+
+-- Atomically validates + persists a batch of removals/additions against a
+-- player's inventory with idempotent replay detection. Restricted to the
+-- CzCraft allow-list. Uses an optimistic generation counter to serialize
+-- against concurrent sync mutators (AddItem/RemoveItem/Set/Clear) without
+-- changing their synchronous signatures.
+--
+-- Concurrency model (PENDING/COMMITTED split):
+--   tx_1 writes ONLY the journal row as PENDING (or detects a true replay /
+--   hash mismatch). players.inventory is NOT touched in tx_1.
+--   After tx_1, a synchronous generation check gates the in-memory swap. Only
+--   when no sync mutator ran during tx_1's await do we swap in-memory and run
+--   tx_2, which atomically writes players.inventory + marks the row COMMITTED.
+--   PENDING therefore unambiguously means "DB inventory not yet written", so a
+--   cross-session retry re-applies safely against the original DB inventory.
+--   A concurrent sync mutation during tx_1 triggers a re-snapshot/re-validate
+--   retry (max 3); a COMMITTED row with matching hash is a true replay.
+--   If tx_2 fails after the in-memory swap, the mutation is tracked as
+--   persist-pending so a same-session retry retries ONLY tx_2 (never
+--   re-validates or re-swaps — the in-memory state already has the batch).
+--
+-- @param identifier string|number player source (as used by AddItem/RemoveItem)
+-- @param mutationId string unique mutation id (caller-supplied, idempotency key)
+-- @param removals table array of { item, amount, slot?, metadata? }
+-- @param additions table array of { item, amount, slot?, info? }
+-- @param reason string optional human-readable reason for the log
+-- @return table { success, replayed?, result?, errors?, reason?, securityIncident? }
+function ApplyIdempotentBatch(identifier, mutationId, removals, additions, reason)
+    local caller = GetInvokingResource()
+    if not caller or not Config.CzCraftAllowedResources[caller] then
+        TriggerEvent('qb-log:server:CreateLog', 'playerinventory', 'ApplyIdempotentBatch blocked', 'red',
+            '**Caller:** ' .. tostring(caller) .. '\n**Mutation:** ' .. tostring(mutationId) .. '\n**Reason:** unauthorized caller')
+        return { success = false, reason = 'unauthorized caller' }
+    end
+
+    if type(mutationId) ~= 'string' or mutationId == '' then
+        return { success = false, reason = 'mutationId must be a non-empty string' }
+    end
+
+    local Player = exports['qb-core']:GetPlayer(identifier)
+    if not Player then
+        return { success = false, reason = 'player not found' }
+    end
+
+    local citizenid = Player.PlayerData.citizenid
+    removals = removals or {}
+    additions = additions or {}
+
+    -- Persist-only retry: a prior attempt of this mutation completed the
+    -- in-memory swap but tx_2 (persist + commit) failed. The in-memory state
+    -- already reflects the batch, so we must NOT re-validate (would fail or
+    -- double-apply) or re-swap. Retry only the persist step.
+    if PersistPending[identifier] and PersistPending[identifier][mutationId] then
+        local resultMeta = { appliedAt = os.time(), caller = caller, reason = reason }
+        local persistOk = MySQL.transaction.await({
+            { query = 'UPDATE `players` SET `inventory` = ? WHERE `citizenid` = ?', values = { json.encode(serializeForSave(Player.PlayerData.items)), citizenid } },
+            { query = 'UPDATE `czcraft_inventory_mutations` SET `status` = ?, `result` = ? WHERE `mutation_id` = ?', values = { 'COMMITTED', json.encode(resultMeta), mutationId } },
+        })
+
+        if persistOk then
+            PersistPending[identifier][mutationId] = nil
+            return { success = true, replayed = false }
+        end
+        return { success = false, reason = 'persist failed' }
+    end
+
+    local MAX_RETRIES = 3
+    local attempt = 0
+    ::retry::
+    attempt = attempt + 1
+    if attempt > MAX_RETRIES then
+        return { success = false, reason = 'inventory changed during apply' }
+    end
+
+    local savedGen = InventoryGeneration[identifier] or 0
+    local result = QBInventoryBatch.validateBatch(
+        Player.PlayerData.items,
+        removals,
+        additions,
+        { maxWeight = Config.MaxWeight, maxSlots = Config.MaxSlots },
+        QBCore.Shared.Items
+    )
+    if not result.ok then
+        return { success = false, errors = result.errors }
+    end
+
+    local canonical = QBInventoryBatch.canonicalPayload(citizenid, removals, additions)
+
+    local txOutcome
+    local replayedResult
+
+    local journalOk = MySQL.startTransaction(function(tx)
+        local rows = tx(
+            'SELECT `mutation_id`, `batch_hash`, `status`, `result` FROM `czcraft_inventory_mutations` WHERE `mutation_id` = ? FOR UPDATE',
+            { mutationId }
+        )
+        if rows and #rows > 0 then
+            local row = rows[1]
+            local hashRows = tx('SELECT SHA2(?, 256) AS `h`', { canonical })
+            local computed = hashRows and hashRows[1] and hashRows[1].h
+            if row.batch_hash ~= computed then
+                txOutcome = 'mismatch'
+                return false
+            end
+            if row.status == 'COMMITTED' then
+                txOutcome = 'replay'
+                replayedResult = row.result and json.decode(row.result) or nil
+                return true
+            end
+            -- PENDING: a prior attempt of this same mutation that did not reach
+            -- COMMITTED. Re-apply against the current (re-snapshotted) items.
+            txOutcome = 'pending'
+            return true
+        end
+        -- No prior row: record the intent as PENDING. players.inventory is
+        -- persisted in tx_2 only after the generation check passes.
+        tx(
+            'INSERT INTO `czcraft_inventory_mutations` (`mutation_id`, `batch_hash`, `identifier`, `removals`, `additions`, `status`) VALUES (?, SHA2(?, 256), ?, ?, ?, "PENDING")',
+            { mutationId, canonical, citizenid, json.encode(removals), json.encode(additions) }
+        )
+        txOutcome = 'pending'
+        return true
+    end)
+
+    if not journalOk then
+        if txOutcome == 'mismatch' then
+            TriggerEvent('qb-log:server:CreateLog', 'playerinventory', 'ApplyIdempotentBatch replay mismatch', 'red',
+                '**Player:** ' .. tostring(identifier) .. '\n**Mutation:** ' .. mutationId .. '\n**Reason:** same mutation id submitted with a different payload')
+            return { success = false, securityIncident = true }
+        end
+        return { success = false, reason = 'journal transaction failed' }
+    end
+
+    if txOutcome == 'replay' then
+        return { success = true, replayed = true, result = replayedResult }
+    end
+
+    -- txOutcome == 'pending': synchronous check-then-swap. No yield is allowed
+    -- between the generation check and the in-memory swap, otherwise a sync
+    -- mutator could slip in and be silently overwritten.
+    if (InventoryGeneration[identifier] or 0) ~= savedGen then
+        goto retry
+    end
+
+    Player.SetPlayerData('items', result.items)
+    bumpGeneration(identifier)
+
+    if not Player.Offline and Player(identifier).state.inv_busy then
+        TriggerClientEvent('qb-inventory:client:updateInventory', identifier)
+    end
+
+    TriggerEvent('qb-log:server:CreateLog', 'playerinventory', 'ApplyIdempotentBatch applied', 'green',
+        '**Player:** ' .. tostring(identifier) .. '\n**Mutation:** ' .. mutationId .. '\n**Removals:** ' .. json.encode(removals) .. '\n**Additions:** ' .. json.encode(additions) .. '\n**Reason:** ' .. tostring(reason) .. '\n**Resource:** ' .. caller)
+
+    -- tx_2: atomically persist the new inventory + mark the mutation COMMITTED.
+    -- If this fails, the in-memory swap already happened but the DB inventory
+    -- and journal remain PENDING. We mark the mutation as persist-pending so a
+    -- same-session retry retries only tx_2 (never re-validates/re-swaps). A
+    -- cross-session retry re-applies against the original DB inventory safely
+    -- (PENDING => DB inventory not yet written).
+    local resultMeta = { appliedAt = os.time(), caller = caller, reason = reason }
+    local persistOk = MySQL.transaction.await({
+        { query = 'UPDATE `players` SET `inventory` = ? WHERE `citizenid` = ?', values = { json.encode(serializeForSave(result.items)), citizenid } },
+        { query = 'UPDATE `czcraft_inventory_mutations` SET `status` = ?, `result` = ? WHERE `mutation_id` = ?', values = { 'COMMITTED', json.encode(resultMeta), mutationId } },
+    })
+
+    if not persistOk then
+        PersistPending[identifier] = PersistPending[identifier] or {}
+        PersistPending[identifier][mutationId] = true
+        return { success = false, reason = 'persist failed' }
+    end
+
+    return { success = true, replayed = false }
+end
+
+exports('ApplyIdempotentBatch', ApplyIdempotentBatch)
