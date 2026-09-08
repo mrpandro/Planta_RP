@@ -14,8 +14,14 @@ Principais componentes:
 - Sistema de voz 3D (pma-voice)
 - Interface e UI responsiva
 - Mapas personalizados (bairros, lojas, locais de trabalho)
-- Scripts próprios em `[meus-scripts]`
+- Anticheat próprio server-side (`prp-anticheat`) com persistência de bans
+- Scripts próprios: `simple-repair` (reparação por item), `simple_speedometer`
+  (HUD de velocidade/cinto), `postal_map` (códigos postais no minimapa)
 - Suite de testes em Lua para validação
+
+> Os recursos do ecossistema QBCore são vendored (upstream). O código realmente
+> específico deste servidor são os scripts próprios acima, o `prp-anticheat`, e as
+> traduções/ajustes pt-PT dentro do `qb-core`.
 
 ## Pilha Técnica
 
@@ -62,7 +68,12 @@ Agora edita `server.cfg` com os teus valores reais:
 | `sv_maxclients` | Número máximo de jogadores (padrão: 48) |
 | `sv_licenseKey` | Obtém em https://keymaster.fivem.net |
 | `steam_webApiKey` | Obtém em https://steamcommunity.com/dev/apikey |
+<<<<<<< HEAD
 | `mysql_connection_string` | String de ligação à BD (ex: `mysql://root:password@127.0.0.1:3306/qbcore?charset=utf8mb4`) |
+=======
+| `sv_enforceGameBuild` | Build do GTA V (atual: **3258**, DLC Bottom Dollar Bounties) |
+| `DISCORD_WEBHOOK_SECURITY` | Webhook usado pelo `prp-anticheat` para alertas |
+>>>>>>> 1a019c85b7732a089dd8d5a21d0850f1f1dc0414
 
 ### 3. Configurar a base de dados
 
