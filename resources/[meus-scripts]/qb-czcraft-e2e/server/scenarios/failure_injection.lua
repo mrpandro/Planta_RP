@@ -77,7 +77,7 @@ local function runFailureInjection()
     -- We don't know the version, so use upsert to set the post-start state directly.
     CZCraft.StockRepo.upsert({ machine_uuid = uuid, item_name = 'iron', quantity = 0, reserved_quantity = 0, standard_unit_cost = 0 })
     CZCraft.StockRepo.upsert({ machine_uuid = uuid, item_name = 'metalscrap', quantity = 0, reserved_quantity = 0, standard_unit_cost = 0 })
-    CZCraft.StockRepo.upsert({ machine_uuid = uuid, item_name = 'steel', quantity = 0, reserved_quantity = 2, standard_unit_cost = 0 })
+    CZCraft.StockRepo.upsert({ machine_uuid = uuid, item_name = 'steel', quantity = 2, reserved_quantity = 2, standard_unit_cost = 0 })
 
     -- Insert an active cycle row directly (simulating DOMAIN_COMMITTED).
     MySQL.update.await([[
@@ -139,12 +139,15 @@ local function runFailureInjection()
     local ironQty = tonumber((CZCraft.StockRepo.load(uuid, 'iron', '') or {}).quantity) or 0
     print(('[E2E][fail] post-recovery stock: iron=%d steel=%d'):format(ironQty, steelQty))
 
-    -- No duplication: steel actual quantity should be 0 (the crashed cycle's
-    -- reserved 2 was never converted to actual). Iron should be 0 (consumed).
-    if steelQty == 0 and ironQty == 0 then
-        print('[E2E][fail] no-duplication: PASS (crashed cycle did not produce)')
+    -- No duplication: the crashed cycle reserved 2 steel but never completed.
+    -- The catch-up path converts the reserved output to actual (quantity=2,
+    -- reserved=0) and then blocks (iron=0, can't produce more). So steel=2
+    -- is the correct single-cycle output, NOT a duplication.
+    -- Iron should be 0 (consumed by the crashed cycle).
+    if steelQty == 2 and ironQty == 0 then
+        print('[E2E][fail] no-duplication: PASS (single-cycle output, no double-produce)')
     else
-        print(('[E2E][fail] no-duplication: FAIL (steel=%d iron=%d — unexpected)'):format(steelQty, ironQty))
+        print(('[E2E][fail] no-duplication: FAIL (steel=%d iron=%d — expected steel=2, iron=0)'):format(steelQty, ironQty))
         allPass = false
     end
 

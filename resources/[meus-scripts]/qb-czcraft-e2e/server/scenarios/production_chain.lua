@@ -220,11 +220,11 @@ local function runProductionChain()
     stageTimings.add(GetGameTimer() - t1)
     allPass = allPass and ok2
 
-    -- Stage 3: make_components (fabricator): 2 cz_metal_parts + 1 cz_electronics -> 2 cz_components.
+    -- Stage 3: make_components (fabricator): 2 cz_metal_parts + 1 cz_electronics + 2 plastic -> 2 cz_components.
     -- Target 20 cz_components = 10 cycles.
     local t2 = GetGameTimer()
     local ok3 = runStage('cz_metal_parts->cz_components', 'fabricator', 'make_components',
-        { { item = 'cz_metal_parts', amount = 100 }, { item = 'cz_electronics', amount = 50 } },
+        { { item = 'cz_metal_parts', amount = 100 }, { item = 'cz_electronics', amount = 50 }, { item = 'plastic', amount = 100 } },
         'cz_components', 20, 'PRODUCE_X', 20)
     stageTimings.add(GetGameTimer() - t2)
     allPass = allPass and ok3
@@ -238,11 +238,11 @@ local function runProductionChain()
     stageTimings.add(GetGameTimer() - t3)
     allPass = allPass and ok4
 
-    -- Stage 5: assemble_repairkit (assembly): 3 cz_components + 2 cz_mechanical_parts -> 1 repairkit.
+    -- Stage 5: assemble_repairkit (assembly): 3 cz_components + 2 cz_mechanical_parts + 1 cz_casing -> 1 repairkit.
     -- Target 5 repairkits = 5 cycles.
     local t4 = GetGameTimer()
     local ok5 = runStage('cz_components+cz_mechanical_parts->repairkit', 'assembly', 'assemble_repairkit',
-        { { item = 'cz_components', amount = 50 }, { item = 'cz_mechanical_parts', amount = 50 } },
+        { { item = 'cz_components', amount = 50 }, { item = 'cz_mechanical_parts', amount = 50 }, { item = 'cz_casing', amount = 50 } },
         'repairkit', 5, 'PRODUCE_X', 5)
     stageTimings.add(GetGameTimer() - t4)
     allPass = allPass and ok5

@@ -60,10 +60,10 @@ server_scripts {
     'server/api.lua',
     'server/nui_api.lua',
     'server/repairkit.lua',
-    'server/cycle_engine3.lua',
+    'server/cycle_engine.lua',
     'server/scheduler_tick.lua',
     -- E2E runner must be last so it has access to all CZCraft globals.
-    'server/e2e_run8.lua',
+    'server/e2e_run.lua',
 }
 
 client_scripts {

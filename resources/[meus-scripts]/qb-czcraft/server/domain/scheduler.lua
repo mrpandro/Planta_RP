@@ -129,6 +129,11 @@ end
 
 -- Rebuilds the heap from a list of { machine_uuid, next_due_at } rows.
 -- Called at startup.
+--
+-- oxmysql returns DATETIME(3) columns as millisecond timestamps (ms since
+-- epoch), not strings. A numeric value >= 1e11 is treated as ms and divided
+-- by 1000 to normalize to seconds (a seconds timestamp for years 2001..2286
+-- is 10 digits, < 1e11). String values are parsed via the ISO regex.
 -- @param rows table
 -- @return table heap
 function Scheduler.buildFromRows(rows)
@@ -136,7 +141,29 @@ function Scheduler.buildFromRows(rows)
     if type(rows) ~= 'table' then return heap end
     for _, row in ipairs(rows) do
         if row.machine_uuid and row.next_due_at then
-            Scheduler.push(heap, tonumber(row.next_due_at) or 0, row.machine_uuid)
+            local dueAt = row.next_due_at
+            if type(dueAt) == 'number' then
+                if dueAt >= 1e11 then dueAt = math.floor(dueAt / 1000) end
+            elseif type(dueAt) == 'string' then
+                local y, mo, d, h, mi, s = dueAt:match('^(%d+)-(%d+)-(%d+)%s+(%d+):(%d+):(%d+)')
+                if y then
+                    local year, month, day = tonumber(y), tonumber(mo), tonumber(d)
+                    local yy = year - (month <= 2 and 1 or 0)
+                    local era = math.floor(yy / 400)
+                    if yy < 0 and (yy % 400 ~= 0) then era = era - 1 end
+                    local yoe = yy - era * 400
+                    local mp = month > 2 and month - 3 or month + 9
+                    local doy = math.floor((153 * mp + 2) / 5) + day - 1
+                    local doe = yoe * 365 + math.floor(yoe / 4) - math.floor(yoe / 100) + doy
+                    local days = era * 146097 + doe - 719468
+                    dueAt = days * 86400 + tonumber(h) * 3600 + tonumber(mi) * 60 + tonumber(s)
+                else
+                    dueAt = tonumber(dueAt) or 0
+                end
+            else
+                dueAt = 0
+            end
+            Scheduler.push(heap, dueAt, row.machine_uuid)
         end
     end
     return heap

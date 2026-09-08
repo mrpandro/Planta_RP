@@ -102,11 +102,21 @@ end
 -- seconds) to a unix timestamp. Uses a timezone-independent civil-calendar
 -- algorithm (Howard Hinnant's days_from_civil) so the result is correct
 -- regardless of the server's local timezone — the DB stores UTC.
+--
+-- oxmysql returns DATETIME(3) columns as millisecond timestamps (ms since
+-- epoch), not strings. A numeric value >= 1e11 is treated as ms and divided
+-- by 1000 to normalize to seconds (a seconds timestamp for years 2001..2286
+-- is 10 digits, < 1e11).
 -- @param iso string|number
 -- @return number|nil unix seconds
 local function parseIsoToUnix(iso)
     if not iso then return nil end
-    if type(iso) == 'number' then return iso end
+    if type(iso) == 'number' then
+        if iso >= 1e11 then
+            return math.floor(iso / 1000)
+        end
+        return iso
+    end
     local y, mo, d, h, mi, s = tostring(iso):match('^(%d+)-(%d+)-(%d+)%s+(%d+):(%d+):(%d+)')
     if not y then return nil end
     local year, month, day = tonumber(y), tonumber(mo), tonumber(d)
@@ -340,18 +350,16 @@ end
 local function runCatchUp(machineUuid, machineVersion, machineType, lastCompletedAt, now)
     local cursor = lastCompletedAt
     local chunkSequence = 0
-    print(('[diag][catchup] enter machine=%s type=%s cursor=%d now=%d'):format(machineUuid, machineType, cursor, now))
 
     for _ = 1, MAX_CATCHUP_CHUNKS do
         local machine = CZCraft.MachinesRepo.load(machineUuid)
-        if not machine then print('[diag][catchup] no machine'); return end
+        if not machine then return end
         local machineVersionFresh = tonumber(machine.version) or machineVersion
 
         local bills = CZCraft.BillsRepo.listActiveForMachine(machineUuid)
         local stockRows = CZCraft.StockRepo.loadAll(machineUuid)
         local machineConfig = findMachineConfig(machineType)
         local capacity = machineConfig and machineConfig.stockCapacity or 0
-        print(('[diag][catchup] bills=%d stockRows=%d capacity=%d type=%s'):format(#bills, #stockRows, capacity, machineType))
 
         local stockPlusReservedByItem = {}
         for _, bill in ipairs(bills) do
@@ -365,21 +373,16 @@ local function runCatchUp(machineUuid, machineVersion, machineType, lastComplete
 
         local bill = CZCraft.Bills.selectNextBill(bills, stockPlusReservedByItem, batchOutputByBill)
         if not bill then
-            print('[diag][catchup] no bill selected -> idle')
             CZCraft.MachinesRepo.clearNextDue(machineUuid, machineVersionFresh)
             return
         end
-        print(('[diag][catchup] bill=%s recipe=%s mode=%s target=%s produced=%s'):format(
-            bill.bill_id, bill.recipe_id, bill.mode, tostring(bill.target_quantity), tostring(bill.produced_quantity)))
 
         local recipe = findRecipe(bill.recipe_id)
         if not recipe then
-            print('[diag][catchup] recipe not found')
             CZCraft.MachinesRepo.setBlocked(machineUuid, 'recipe not found: ' .. tostring(bill.recipe_id), nil, machineVersionFresh)
             return
         end
         if recipe.enabled == false then
-            print('[diag][catchup] recipe disabled')
             CZCraft.MachinesRepo.setBlocked(machineUuid, 'recipe disabled', recipe.id, machineVersionFresh)
             return
         end
@@ -388,8 +391,6 @@ local function runCatchUp(machineUuid, machineVersion, machineType, lastComplete
         local usedWeight = CZCraft.Storage.computeUsedWeight(stockRows, itemWeights)
         local reservedWeight = CZCraft.Storage.sumReserved(stockRows)
         local batch = batchOutputAmount(recipe)
-        print(('[diag][catchup] usedWeight=%s reservedWeight=%s batch=%s'):format(
-            tostring(usedWeight), tostring(reservedWeight), tostring(batch)))
 
         local result = CZCraft.CatchUp.computeCatchUpChunk({
             lastCompletedAt = cursor,
@@ -411,8 +412,6 @@ local function runCatchUp(machineUuid, machineVersion, machineType, lastComplete
         })
 
         if result.cyclesToRun <= 0 then
-            print(('[diag][catchup] cyclesToRun=0 blockReason=%s shouldContinue=%s'):format(
-                tostring(result.blockReason), tostring(result.shouldContinue)))
             if result.blockReason then
                 local m = CZCraft.MachinesRepo.load(machineUuid)
                 CZCraft.MachinesRepo.setBlocked(machineUuid, result.blockReason, nil, m and tonumber(m.version) or machineVersionFresh)
@@ -422,8 +421,6 @@ local function runCatchUp(machineUuid, machineVersion, machineType, lastComplete
             -- Fall through to start a real-time cycle for the remaining time.
             break
         end
-        print(('[diag][catchup] cyclesToRun=%d nextChunkElapsed=%s shouldContinue=%s'):format(
-            result.cyclesToRun, tostring(result.nextChunkElapsed), tostring(result.shouldContinue)))
 
         chunkSequence = chunkSequence + 1
         local chunkStart = cursor
@@ -487,14 +484,14 @@ end
 -- tick loop never blocks on per-machine MySQL work.
 -- @param machineUuid string
 local function processMachine(machineUuid)
-    if not CZCraft.Runtime or not CZCraft.Runtime.isReady then print('[diag][process] runtime not ready'); return end
-    if not CZCraft.Config.General.features.scheduler then print('[diag][process] scheduler disabled'); return end
-    if not CZCraft.Config.General.features.production then print('[diag][process] production disabled'); return end
+    if not CZCraft.Runtime or not CZCraft.Runtime.isReady then return end
+    if not CZCraft.Config.General.features.scheduler then return end
+    if not CZCraft.Config.General.features.production then return end
 
     local machine = CZCraft.MachinesRepo.load(machineUuid)
-    if not machine then print('[diag][process] no machine ' .. tostring(machineUuid)); return end
+    if not machine then return end
     -- Only INSTALLED machines are processed.
-    if machine.lifecycle ~= 'INSTALLED' then print('[diag][process] lifecycle=' .. tostring(machine.lifecycle)); return end
+    if machine.lifecycle ~= 'INSTALLED' then return end
 
     local machineUuid_ = machine.machine_uuid
     local machineVersion = tonumber(machine.version) or 0

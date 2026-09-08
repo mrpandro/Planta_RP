@@ -51,20 +51,21 @@ local function runDowntimeCatchup()
     -- But the user asked for 24h+. Use a lighter item: make_metal_parts outputs
     -- cz_metal_parts (weight 200g) — even heavier. Use smelt_steel but with a
     -- PRODUCE_X target that stops before capacity.
-    -- Target: 1000 steel = 500 cycles = 30000s = 8.3h. Set downtime to 25h.
-    -- The bill completes at 500 cycles, machine goes idle. Verifies catch-up
+    -- Target: 680 steel = 340 cycles = 20400s = 5.7h. Set downtime to 25h.
+    -- The bill completes at 340 cycles, machine goes idle. Verifies catch-up
     -- respects the bill target, not just time.
+    -- Input: 1700 iron (1700*140g = 238000g < 250000g capacity) + 680 metalscrap.
     local downtimeSec = 25 * 3600  -- 25h
     local pastIso = os.date('!%Y-%m-%d %H:%M:%S.000', os.time() - downtimeSec)
 
-    -- Deposit enough for 500 cycles: 2500 iron + 1000 metalscrap.
-    CZCraft.StockRepo.upsert({ machine_uuid = uuid, item_name = 'iron', quantity = 2500, reserved_quantity = 0, standard_unit_cost = 0 })
-    CZCraft.StockRepo.upsert({ machine_uuid = uuid, item_name = 'metalscrap', quantity = 1000, reserved_quantity = 0, standard_unit_cost = 0 })
+    -- Deposit enough for 340 cycles: 1700 iron + 680 metalscrap.
+    CZCraft.StockRepo.upsert({ machine_uuid = uuid, item_name = 'iron', quantity = 1700, reserved_quantity = 0, standard_unit_cost = 0 })
+    CZCraft.StockRepo.upsert({ machine_uuid = uuid, item_name = 'metalscrap', quantity = 680, reserved_quantity = 0, standard_unit_cost = 0 })
 
     local billId = 'e2e-downtime-1-' .. tostring(math.random(100000, 999999))
     CZCraft.BillsRepo.create({
         bill_id = billId, machine_uuid = uuid, recipe_id = 'smelt_steel',
-        mode = 'PRODUCE_X', primary_output = 'steel', target_quantity = 1000,
+        mode = 'PRODUCE_X', primary_output = 'steel', target_quantity = 680,
         priority = 'NORMAL', created_by_type = 'PLAYER', created_by_id = cid,
     })
 
@@ -76,10 +77,18 @@ local function runDowntimeCatchup()
     print(('[E2E][downtime] pre-catchup: iron=%d steel=%d next_due_at=%s'):format(preIron, preSteel, pastIso))
 
     -- Fire processMachine and measure catch-up time.
+    -- Use the direct call (not TriggerEvent) so the catch-up runs
+    -- synchronously in this thread. TriggerEvent spawns a separate thread
+    -- and the machine is already STOPPED, so the settle check below would
+    -- break immediately before the catch-up completes.
     local tStart = GetGameTimer()
-    TriggerEvent('qb-czcraft:internal:processMachine', uuid)
+    if CZCraft.CycleEngine and CZCraft.CycleEngine.processMachine then
+        CZCraft.CycleEngine.processMachine(uuid)
+    else
+        TriggerEvent('qb-czcraft:internal:processMachine', uuid)
+    end
 
-    -- Wait for settle (catch-up of 500 cycles in chunks of 100 = 5 chunks).
+    -- Wait for settle (catch-up of 340 cycles in chunks of 100 = 4 chunks).
     local waited = 0
     while waited < 30000 do
         local m = CZCraft.MachinesRepo.load(uuid)
@@ -100,30 +109,30 @@ local function runDowntimeCatchup()
         bill.status, tonumber(bill.produced_quantity) or 0, tonumber(bill.target_quantity) or 0))
     print(('[E2E][downtime] catch-up elapsed: %dms (%.2fs)'):format(catchupMs, catchupMs / 1000.0))
 
-    -- Verify: 500 cycles ran, 1000 steel produced, 2500 iron consumed.
-    if postSteel == 1000 and postIron == 0 then
-        print('[E2E][downtime] full catch-up: PASS (500 cycles, correct deltas)')
+    -- Verify: 340 cycles ran, 680 steel produced, 1700 iron consumed.
+    if postSteel == 680 and postIron == 0 then
+        print('[E2E][downtime] full catch-up: PASS (340 cycles, correct deltas)')
     else
-        print(('[E2E][downtime] full catch-up: FAIL (steel=%d expected 1000, iron=%d expected 0)'):format(postSteel, postIron))
+        print(('[E2E][downtime] full catch-up: FAIL (steel=%d expected 680, iron=%d expected 0)'):format(postSteel, postIron))
         allPass = false
     end
 
     -- Verify bill completed.
-    if bill.status == 'COMPLETED' and tonumber(bill.produced_quantity) == 1000 then
+    if bill.status == 'COMPLETED' and tonumber(bill.produced_quantity) == 680 then
         print('[E2E][downtime] bill completion: PASS')
     else
         print('[E2E][downtime] bill completion: FAIL')
         allPass = false
     end
 
-    -- Verify production events: 5 chunks (500 cycles / 100 per chunk).
+    -- Verify production events: 4 chunks (340 cycles / 100 per chunk = 3 full + 1 partial).
     local events = MySQL.query.await(
         'SELECT COUNT(*) AS cnt, SUM(`cycles_completed`) AS total_cycles FROM `czcraft_production_events` WHERE `machine_uuid` = ?',
         { uuid })
     local eventCount = events and tonumber(events[1].cnt) or 0
     local totalCycles = events and tonumber(events[1].total_cycles) or 0
     print(('[E2E][downtime] production_events: %d chunks, %d total cycles'):format(eventCount, totalCycles))
-    if totalCycles == 500 then
+    if totalCycles == 340 then
         print('[E2E][downtime] chunked events: PASS')
     else
         print('[E2E][downtime] chunked events: FAIL')
@@ -151,7 +160,11 @@ local function runDowntimeCatchup()
     local pastIso2 = os.date('!%Y-%m-%d %H:%M:%S.000', os.time() - 86400)
     MySQL.update.await('UPDATE `czcraft_machines` SET `next_due_at` = ? WHERE `machine_uuid` = ?', { pastIso2, uuid2 })
 
-    TriggerEvent('qb-czcraft:internal:processMachine', uuid2)
+    if CZCraft.CycleEngine and CZCraft.CycleEngine.processMachine then
+        CZCraft.CycleEngine.processMachine(uuid2)
+    else
+        TriggerEvent('qb-czcraft:internal:processMachine', uuid2)
+    end
     waited = 0
     while waited < 15000 do
         local m2 = CZCraft.MachinesRepo.load(uuid2)

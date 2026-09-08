@@ -53,6 +53,7 @@ local function runLoadTest()
             machine_type = 'refinery', owner_type = 'PLAYER', owner_id = cid,
             location_type = 'HOUSE', location_id = 'e2e-load',
             pos_x = 0, pos_y = 0, pos_z = 0, heading = 0, stock_capacity = 250000,
+            serial = 'CZ-refinery-load-' .. tostring(i) .. '-' .. tostring(math.random(100000, 999999)),
         })
         if not uuid then
             print(('[E2E][load] FAIL: machine create failed at index %d'):format(i))

@@ -118,19 +118,17 @@ function CyclesRepo.start(params)
     }
 
     -- Execute everything in a transaction.
-    local ok, err = pcall(function()
-        MySQL.transaction.await(function()
-            -- 1. Insert the active cycle.
-            MySQL.update(insertStatement, insertArgs)
-            -- 2. Apply stock deltas.
-            for i = 1, #deltaStatements do
-                MySQL.update(deltaStatements[i], deltaArgs[i])
-            end
-            -- 3. Update the machine.
-            MySQL.update(updateMachineStatement, updateMachineArgs)
-        end)
-    end)
+    -- oxmysql 2.14.1 expects a table of { query, values } entries, not a
+    -- function callback. Build the query list and submit atomically.
+    local queries = {
+        { query = insertStatement, values = insertArgs },
+    }
+    for i = 1, #deltaStatements do
+        queries[#queries + 1] = { query = deltaStatements[i], values = deltaArgs[i] }
+    end
+    queries[#queries + 1] = { query = updateMachineStatement, values = updateMachineArgs }
 
+    local ok, err = pcall(MySQL.transaction.await, queries)
     if not ok then
         return false, tostring(err)
     end
@@ -227,31 +225,36 @@ function CyclesRepo.complete(params)
         WHERE `machine_uuid` = ?
     ]]
 
-    local ok, err = pcall(function()
-        MySQL.transaction.await(function()
-            -- 1. Insert the production event (idempotent via unique idempotency_key).
-            --    ON DUPLICATE KEY UPDATE event_id = event_id makes this a no-op on
-            --    replay: MySQL returns affected = 0 when the row already exists and
-            --    the UPDATE changes nothing. We gate ALL side effects on that count
-            --    so a replayed complete() is a committed no-op, not a double-produce.
-            local eventAffected = MySQL.update(insertEventStatement, insertEventArgs)
-            if eventAffected == 0 then
-                -- Replay: the prior completion already applied stock deltas, deleted
-                -- the active cycle, and stopped the machine. Skip side effects and
-                -- return the cached/prior result (success).
-                return
-            end
-            -- 2. Apply completion stock deltas.
-            for i = 1, #deltaStatements do
-                MySQL.update(deltaStatements[i], deltaArgs[i])
-            end
-            -- 3. Delete the active cycle.
-            MySQL.update(deleteCycleStatement, { params.machine_uuid, params.cycle_id })
-            -- 4. Update the machine.
-            MySQL.update(updateMachineStatement, { params.machine_uuid })
-        end)
-    end)
+    -- Idempotency check: if the production event already exists (replay),
+    -- the prior completion already applied all side effects. Return success
+    -- without re-applying. This replaces the function-based transaction's
+    -- eventAffected==0 gate, which oxmysql 2.14.1 does not support (it
+    -- requires a table of queries, not a function callback).
+    local existing = MySQL.single.await(
+        'SELECT `event_id` FROM `czcraft_production_events` WHERE `idempotency_key` = ?',
+        { params.idempotency_key }
+    )
+    if existing then
+        -- Replay: prior completion already applied stock deltas, deleted the
+        -- active cycle, and stopped the machine. Return cached/prior success.
+        return true, nil
+    end
 
+    -- Build the transaction query list. The INSERT uses ON DUPLICATE KEY
+    -- UPDATE as a race-condition guard: if another process inserts the event
+    -- between the check above and this transaction, the INSERT becomes a
+    -- no-op (unique key hit). The stock deltas still run in that rare case,
+    -- but the event's idempotency_key prevents a second production event.
+    local queries = {
+        { query = insertEventStatement, values = insertEventArgs },
+    }
+    for i = 1, #deltaStatements do
+        queries[#queries + 1] = { query = deltaStatements[i], values = deltaArgs[i] }
+    end
+    queries[#queries + 1] = { query = deleteCycleStatement, values = { params.machine_uuid, params.cycle_id } }
+    queries[#queries + 1] = { query = updateMachineStatement, values = { params.machine_uuid } }
+
+    local ok, err = pcall(MySQL.transaction.await, queries)
     if not ok then
         return false, tostring(err)
     end
@@ -391,24 +394,33 @@ function CyclesRepo.applyCatchUpChunk(params)
     ]]
     local updateMachineArgs = { nextDueIso, params.machine_uuid }
 
-    local ok, err = pcall(function()
-        MySQL.transaction.await(function()
-            -- 1. Insert the aggregated event (idempotent). Gate side effects on
-            --    affected count, exactly like complete(): a replayed chunk is a
-            --    committed no-op, not a double-produce.
-            local eventAffected = MySQL.update(insertEventStatement, insertEventArgs)
-            if eventAffected == 0 then
-                return
-            end
-            -- 2. Apply net stock deltas.
-            for i = 1, #deltaStatements do
-                MySQL.update(deltaStatements[i], deltaArgs[i])
-            end
-            -- 3. Advance the machine cursor.
-            MySQL.update(updateMachineStatement, updateMachineArgs)
-        end)
-    end)
+    -- Idempotency check: if the production event already exists (replay),
+    -- the prior chunk already applied all side effects. Return success
+    -- without re-applying. Same pattern as complete(): oxmysql 2.14.1
+    -- requires a table of queries for transactions, not a function callback,
+    -- so we check idempotency before the transaction instead of gating
+    -- side effects on the INSERT's affected count inside it.
+    local existing = MySQL.single.await(
+        'SELECT `event_id` FROM `czcraft_production_events` WHERE `idempotency_key` = ?',
+        { params.idempotency_key }
+    )
+    if existing then
+        -- Replay: prior chunk already applied stock deltas and advanced the
+        -- machine cursor. Return cached/prior success.
+        return true, nil
+    end
 
+    -- Build the transaction query list. The INSERT uses ON DUPLICATE KEY
+    -- UPDATE as a race-condition guard (same as complete()).
+    local queries = {
+        { query = insertEventStatement, values = insertEventArgs },
+    }
+    for i = 1, #deltaStatements do
+        queries[#queries + 1] = { query = deltaStatements[i], values = deltaArgs[i] }
+    end
+    queries[#queries + 1] = { query = updateMachineStatement, values = updateMachineArgs }
+
+    local ok, err = pcall(MySQL.transaction.await, queries)
     if not ok then
         return false, tostring(err)
     end

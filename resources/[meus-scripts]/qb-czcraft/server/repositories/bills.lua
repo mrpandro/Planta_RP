@@ -144,13 +144,17 @@ end
 function BillsRepo.incrementProduced(billId, expectedVersion, batchOutputAmount, mode, targetQuantity)
     if mode == 'PRODUCE_X' then
         -- Mark COMPLETED if produced + batch >= target.
+        -- NOTE: MySQL evaluates SET assignments left-to-right, so if
+        -- produced_quantity is updated before the CASE, the CASE would see
+        -- the new value and double-count the batch. Evaluate the CASE first
+        -- (against the old produced_quantity) so the comparison is correct.
         local affected = MySQL.update.await([[
             UPDATE `czcraft_bills`
-            SET `produced_quantity` = `produced_quantity` + ?,
-                `status` = CASE WHEN `produced_quantity` + ? >= ? THEN 'COMPLETED' ELSE `status` END,
+            SET `status` = CASE WHEN `produced_quantity` + ? >= ? THEN 'COMPLETED' ELSE `status` END,
+                `produced_quantity` = `produced_quantity` + ?,
                 `version` = `version` + 1
             WHERE `bill_id` = ? AND `version` = ?
-        ]], { batchOutputAmount, batchOutputAmount, targetQuantity, billId, expectedVersion })
+        ]], { batchOutputAmount, targetQuantity, batchOutputAmount, billId, expectedVersion })
         if affected == 0 then
             return false, 'optimistic version mismatch'
         end

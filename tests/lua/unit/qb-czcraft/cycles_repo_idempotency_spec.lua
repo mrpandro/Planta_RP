@@ -1,39 +1,47 @@
 -- Regression test for CyclesRepo.complete() idempotency guard.
 -- This is the second replay-safety bug found by hand rather than by test.
--- The fix gates ALL side effects (stock deltas, cycle delete, machine update)
--- on the production-event INSERT's affected count. If affected = 0 (replay),
--- the transaction is a committed no-op.
+-- The fix checks idempotency via MySQL.single.await BEFORE the transaction:
+-- if the production event already exists (replay), return success without
+-- running the transaction. This replaces the function-based transaction's
+-- eventAffected==0 gate, which oxmysql 2.14.1 does not support (it requires
+-- a table of queries, not a function callback).
 --
 -- This test mocks the MySQL global to verify the guard at the code level.
 -- The companion DB-level test (TEST 5 in czcraft_repo_integration.py) verifies
 -- the same scenario against the real staging DB with positive-only deltas.
 
--- Mock MySQL: tracks every update call and returns configurable affected counts.
-local updateCalls = {}
-local nextAffected = {}  -- queue of affected counts to return per update call
+-- Mock MySQL: tracks every query in the transaction and every single call.
+local txQueries = {}
+local singleCalls = {}
+local singleReturnQueue = {}  -- queue of return values for MySQL.single.await
 
-local function mockUpdate(stmt, args)
-    local call = { stmt = stmt, args = args }
-    updateCalls[#updateCalls + 1] = call
-    -- Pop the next configured affected count, default to 1.
-    if #nextAffected > 0 then
-        return table.remove(nextAffected, 1)
+local function mockSingleAwait(stmt, args)
+    singleCalls[#singleCalls + 1] = { stmt = stmt, args = args }
+    if #singleReturnQueue > 0 then
+        return table.remove(singleReturnQueue, 1)
     end
-    return 1
+    return nil
 end
 
 MySQL = {
     transaction = {
-        await = function(fn)
-            -- Execute the transaction body synchronously.
-            return fn()
+        await = function(queries)
+            -- Table-based transaction: execute each query's values are
+            -- tracked. Return true (success).
+            for _, q in ipairs(queries) do
+                txQueries[#txQueries + 1] = { stmt = q.query, args = q.values }
+            end
+            return true
         end,
     },
-    update = mockUpdate,
+    update = function(stmt, args)
+        -- Should not be called directly anymore (queries go through the
+        -- transaction table). Track if it is, for diagnostic purposes.
+        txQueries[#txQueries + 1] = { stmt = stmt, args = args }
+        return 1
+    end,
     single = {
-        await = function(stmt, args)
-            return nil
-        end,
+        await = mockSingleAwait,
     },
     query = {
         await = function(stmt, args)
@@ -71,13 +79,14 @@ local function assertTrue(value, message)
 end
 
 local function resetCalls()
-    updateCalls = {}
-    nextAffected = {}
+    txQueries = {}
+    singleCalls = {}
+    singleReturnQueue = {}
 end
 
-local function countUpdatesContaining(fragment)
+local function countTxQueriesContaining(fragment)
     local count = 0
-    for _, call in ipairs(updateCalls) do
+    for _, call in ipairs(txQueries) do
         if string.find(call.stmt, fragment, 1, true) then
             count = count + 1
         end
@@ -94,8 +103,9 @@ return {
         name = "complete() applies stock deltas, cycle delete, and machine update on first call (affected=1)",
         test = function()
             resetCalls()
-            -- First call: event INSERT returns 1 (new row), all subsequent updates return 1.
-            nextAffected = { 1, 1, 1, 1, 1 }  -- event insert + 2 deltas + cycle delete + machine update
+            -- First call: MySQL.single.await returns nil (no existing event).
+            -- The transaction should run with all queries.
+            singleReturnQueue = { nil }
 
             local ok, err = CyclesRepo.complete({
                 cycle_id = "cycle-1",
@@ -117,20 +127,23 @@ return {
 
             assertTrue(ok, "should succeed")
             assertEqual(err, nil, "no error")
-            assertEqual(#updateCalls, 5, "5 update calls: event + 2 deltas + cycle delete + machine update")
-            assertTrue(countUpdatesContaining("czcraft_production_events") == 1, "one production event insert")
-            assertTrue(countUpdatesContaining("czcraft_machine_stock") == 2, "two stock delta updates")
-            assertTrue(countUpdatesContaining("DELETE FROM `czcraft_active_cycles`") == 1, "one cycle delete")
-            assertTrue(countUpdatesContaining("operational_status` = 'STOPPED'") == 1, "one machine update")
+            -- 1 single call (idempotency check) + 5 transaction queries:
+            -- event insert + 2 deltas + cycle delete + machine update.
+            assertEqual(#singleCalls, 1, "one idempotency check via MySQL.single.await")
+            assertEqual(#txQueries, 5, "5 tx queries: event + 2 deltas + cycle delete + machine update")
+            assertTrue(countTxQueriesContaining("czcraft_production_events") == 1, "one production event insert")
+            assertTrue(countTxQueriesContaining("czcraft_machine_stock") == 2, "two stock delta updates")
+            assertTrue(countTxQueriesContaining("DELETE FROM `czcraft_active_cycles`") == 1, "one cycle delete")
+            assertTrue(countTxQueriesContaining("operational_status` = 'STOPPED'") == 1, "one machine update")
         end,
     },
     {
         name = "complete() skips ALL side effects on replay (event INSERT affected=0)",
         test = function()
             resetCalls()
-            -- Replay: event INSERT returns 0 (duplicate key no-op).
-            -- No subsequent updates should be called.
-            nextAffected = { 0 }
+            -- Replay: MySQL.single.await returns an existing event row.
+            -- No transaction should run.
+            singleReturnQueue = { { event_id = "event-1" } }
 
             local ok, err = CyclesRepo.complete({
                 cycle_id = "cycle-1",
@@ -152,12 +165,13 @@ return {
 
             assertTrue(ok, "should succeed (cached/prior result)")
             assertEqual(err, nil, "no error on replay")
-            -- ONLY the event INSERT should have been called. No stock deltas, no cycle delete, no machine update.
-            assertEqual(#updateCalls, 1, "only 1 update call (event insert) on replay")
-            assertTrue(countUpdatesContaining("czcraft_production_events") == 1, "one production event insert (no-op)")
-            assertTrue(countUpdatesContaining("czcraft_machine_stock") == 0, "NO stock delta updates on replay")
-            assertTrue(countUpdatesContaining("DELETE FROM `czcraft_active_cycles`") == 0, "NO cycle delete on replay")
-            assertTrue(countUpdatesContaining("operational_status` = 'STOPPED'") == 0, "NO machine update on replay")
+            -- Only the idempotency check should have run. No transaction queries.
+            assertEqual(#singleCalls, 1, "one idempotency check via MySQL.single.await")
+            assertEqual(#txQueries, 0, "NO transaction queries on replay")
+            assertTrue(countTxQueriesContaining("czcraft_production_events") == 0, "NO production event insert on replay")
+            assertTrue(countTxQueriesContaining("czcraft_machine_stock") == 0, "NO stock delta updates on replay")
+            assertTrue(countTxQueriesContaining("DELETE FROM `czcraft_active_cycles`") == 0, "NO cycle delete on replay")
+            assertTrue(countTxQueriesContaining("operational_status` = 'STOPPED'") == 0, "NO machine update on replay")
         end,
     },
     {
@@ -167,8 +181,9 @@ return {
             -- This reproduces test 3b exactly: positive-only completion deltas
             -- (no negative reserved release). Before the fix, the replay would
             -- commit the +1 steel delta a second time, double-producing output.
-            -- After the fix, affected=0 on the event INSERT skips the delta.
-            nextAffected = { 0 }
+            -- After the fix, the idempotency check returns an existing event,
+            -- so no transaction runs and no deltas are applied.
+            singleReturnQueue = { { event_id = "event-2" } }
 
             local ok, err = CyclesRepo.complete({
                 cycle_id = "cycle-2",
@@ -189,8 +204,8 @@ return {
 
             assertTrue(ok, "should succeed (cached/prior result)")
             assertEqual(err, nil, "no error on replay")
-            assertEqual(#updateCalls, 1, "only 1 update call (event insert) on replay")
-            assertTrue(countUpdatesContaining("czcraft_machine_stock") == 0,
+            assertEqual(#txQueries, 0, "NO transaction queries on replay")
+            assertTrue(countTxQueriesContaining("czcraft_machine_stock") == 0,
                 "NO stock delta on replay — output quantity must NOT increase a second time")
         end,
     },
@@ -199,7 +214,7 @@ return {
         test = function()
             resetCalls()
             -- No deltas, but the guard should still prevent cycle delete + machine update on replay.
-            nextAffected = { 0 }
+            singleReturnQueue = { { event_id = "event-3" } }
 
             local ok, err = CyclesRepo.complete({
                 cycle_id = "cycle-3",
@@ -217,10 +232,10 @@ return {
             })
 
             assertTrue(ok, "should succeed")
-            assertEqual(#updateCalls, 1, "only event insert on replay with no deltas")
-            assertTrue(countUpdatesContaining("DELETE FROM `czcraft_active_cycles`") == 0,
+            assertEqual(#txQueries, 0, "NO transaction queries on replay even with no deltas")
+            assertTrue(countTxQueriesContaining("DELETE FROM `czcraft_active_cycles`") == 0,
                 "NO cycle delete on replay even with no deltas")
-            assertTrue(countUpdatesContaining("operational_status` = 'STOPPED'") == 0,
+            assertTrue(countTxQueriesContaining("operational_status` = 'STOPPED'") == 0,
                 "NO machine update on replay even with no deltas")
         end,
     },
