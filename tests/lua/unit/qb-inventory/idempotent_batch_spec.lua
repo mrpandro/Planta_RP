@@ -318,4 +318,168 @@ return {
             assertFalse(r2.ok, "non-table registry should fail")
         end,
     },
+    {
+        name = "non-table itemsClone -> error",
+        test = function()
+            local r = validateBatch("not-a-table", {}, {}, constraints, itemRegistry)
+            assertFalse(r.ok, "should fail")
+            assertTrue(findErrorByMessage(r.errors, "itemsClone must be a table"), "error mentions itemsClone")
+        end,
+    },
+    {
+        name = "non-table removal entry -> error",
+        test = function()
+            local r = validateBatch(freshInventory(), { "not-a-table" }, {}, constraints, itemRegistry)
+            assertFalse(r.ok, "should fail")
+            assertTrue(findErrorByMessage(r.errors, "removal must be a table"), "error mentions removal must be a table")
+        end,
+    },
+    {
+        name = "non-table addition entry -> error",
+        test = function()
+            local r = validateBatch(freshInventory(), {}, { "not-a-table" }, constraints, itemRegistry)
+            assertFalse(r.ok, "should fail")
+            assertTrue(findErrorByMessage(r.errors, "addition must be a table"), "error mentions addition must be a table")
+        end,
+    },
+    {
+        name = "removal: non-string item name -> error",
+        test = function()
+            local r = validateBatch(freshInventory(), { { item = 123, amount = 1 } }, {}, constraints, itemRegistry)
+            assertFalse(r.ok, "should fail")
+            assertTrue(findErrorByMessage(r.errors, "item must be a non-empty string"), "error mentions non-empty string")
+        end,
+    },
+    {
+        name = "removal: empty item name -> error",
+        test = function()
+            local r = validateBatch(freshInventory(), { { item = '', amount = 1 } }, {}, constraints, itemRegistry)
+            assertFalse(r.ok, "should fail")
+            assertTrue(findErrorByMessage(r.errors, "item must be a non-empty string"), "error mentions non-empty string")
+        end,
+    },
+    {
+        name = "removal: item not in registry -> error",
+        test = function()
+            local r = validateBatch(freshInventory(), { { item = 'unobtainium', amount = 1 } }, {}, constraints, itemRegistry)
+            assertFalse(r.ok, "should fail")
+            assertTrue(findErrorByMessage(r.errors, "not in the registry"), "error mentions registry")
+        end,
+    },
+    {
+        name = "removal: slot out of range -> error",
+        test = function()
+            local r = validateBatch(freshInventory(), { { item = 'iron', amount = 1, slot = 41 } }, {}, constraints, itemRegistry)
+            assertFalse(r.ok, "should fail")
+            assertTrue(findErrorByMessage(r.errors, "slot out of range"), "error mentions slot out of range")
+        end,
+    },
+    {
+        name = "removal: valid explicit slot succeeds",
+        test = function()
+            local inv = { [1] = makeItem('iron', 10, 1, {}), [2] = makeItem('steel', 5, 2, {}) }
+            local r = validateBatch(inv, { { item = 'steel', amount = 2, slot = 2 } }, {}, constraints, itemRegistry)
+            assertTrue(r.ok, "should succeed")
+            assertEqual(r.items[2].amount, 3, "steel reduced to 3 at slot 2")
+        end,
+    },
+    {
+        name = "addition: non-string item name -> error",
+        test = function()
+            local r = validateBatch(freshInventory(), {}, { { item = 123, amount = 1 } }, constraints, itemRegistry)
+            assertFalse(r.ok, "should fail")
+            assertTrue(findErrorByMessage(r.errors, "item must be a non-empty string"), "error mentions non-empty string")
+        end,
+    },
+    {
+        name = "addition: bad amount (non-positive-integer) -> error",
+        test = function()
+            local r = validateBatch(freshInventory(), {}, { { item = 'steel', amount = -1 } }, constraints, itemRegistry)
+            assertFalse(r.ok, "should fail")
+            assertTrue(findErrorByMessage(r.errors, "amount must be a positive integer"), "error mentions positive integer")
+        end,
+    },
+    {
+        name = "addition: explicit slot stacking into same non-unique item succeeds",
+        test = function()
+            local r = validateBatch(freshInventory(), {}, { { item = 'iron', amount = 5, slot = 1 } }, constraints, itemRegistry)
+            assertTrue(r.ok, "should succeed")
+            assertEqual(r.items[1].amount, 15, "iron stacked to 15 at explicit slot 1")
+        end,
+    },
+    {
+        name = "addition: explicit free slot succeeds",
+        test = function()
+            local r = validateBatch(freshInventory(), {}, { { item = 'steel', amount = 2, slot = 3 } }, constraints, itemRegistry)
+            assertTrue(r.ok, "should succeed")
+            assertTrue(r.items[3] and r.items[3].name == 'steel', "steel placed at explicit slot 3")
+            assertEqual(r.items[3].amount, 2, "steel amount 2")
+        end,
+    },
+    {
+        name = "addition: exceeds max slots via usedSlotCount -> error",
+        test = function()
+            -- Fill all slots in a 1-slot inventory, then try to add a different item
+            local tiny = { maxWeight = 120000, maxSlots = 1 }
+            local inv = { [1] = makeItem('iron', 10, 1, {}) }
+            local r = validateBatch(inv, {}, { { item = 'steel', amount = 1 } }, tiny, itemRegistry)
+            assertFalse(r.ok, "should fail")
+            assertTrue(findErrorByMessage(r.errors, "no free slot") or findErrorByMessage(r.errors, "max slots"), "error mentions slots")
+        end,
+    },
+    {
+        name = "canonicalPayload: metadata in removals exercises canonicalizeValue",
+        test = function()
+            -- Removals with metadata: nil, boolean, number, string, array, map
+            local removals = {
+                { item = 'iron', amount = 1, metadata = { quality = 50 } },           -- map
+                { item = 'iron', amount = 1, metadata = { 1, 2, 3 } },                -- array
+                { item = 'iron', amount = 1, metadata = { flag = true } },             -- boolean
+                { item = 'iron', amount = 1, metadata = { count = 42 } },             -- number
+                { item = 'iron', amount = 1, metadata = { name = "test" } },           -- string
+            }
+            local a = canonicalPayload('ABC', removals, {})
+            local b = canonicalPayload('ABC', removals, {})
+            assertEqual(a, b, "same metadata payloads produce identical canonical strings")
+
+            -- Different metadata produces a different canonical string
+            local removals2 = {
+                { item = 'iron', amount = 1, metadata = { quality = 99 } },
+            }
+            local c = canonicalPayload('ABC', removals2, {})
+            assertTrue(a ~= c, "different metadata produces different canonical string")
+        end,
+    },
+    {
+        name = "canonicalPayload: info in additions exercises canonicalizeValue",
+        test = function()
+            local additions = {
+                { item = 'steel', amount = 1, info = { quality = 50 } },              -- map
+                { item = 'steel', amount = 1, info = { 1, 2, 3 } },                   -- array
+                { item = 'steel', amount = 1, info = { flag = true } },               -- boolean
+                { item = 'steel', amount = 1, info = { count = 42 } },                -- number
+                { item = 'steel', amount = 1, info = { name = "test" } },             -- string
+            }
+            local a = canonicalPayload('ABC', {}, additions)
+            local b = canonicalPayload('ABC', {}, additions)
+            assertEqual(a, b, "same info payloads produce identical canonical strings")
+
+            -- Different info produces a different canonical string
+            local additions2 = {
+                { item = 'steel', amount = 1, info = { quality = 99 } },
+            }
+            local c = canonicalPayload('ABC', {}, additions2)
+            assertTrue(a ~= c, "different info produces different canonical string")
+        end,
+    },
+    {
+        name = "canonicalPayload: nil metadata/info handled (empty string, not 'null')",
+        test = function()
+            -- No metadata/info → meta field is '' (empty), not 'null'
+            local withoutMeta = canonicalPayload('X', { { item = 'iron', amount = 1 } }, {})
+            -- With nil metadata → canonicalizeValue(nil) would return 'null',
+            -- but the guard `descriptor.metadata ~= nil` short-circuits to ''
+            assertTrue(string.find(withoutMeta, 'null') == nil, "nil metadata should not produce 'null' in canonical string")
+        end,
+    },
 }

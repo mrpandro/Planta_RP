@@ -2,11 +2,19 @@
 
 ## Before v0.1 E2E gate
 
-- [ ] Full staging E2E: placement → bill creation → cycle execution → stock
-      update → NUI dashboard verification → repairkit flow
-- [ ] Verify server-side vehicle repair natives (SetVehicleFixed, etc.) work
-      correctly in FiveM runtime — some natives may behave differently
-      server-side vs client-side
+- [x] **Implement processMachine cycle engine** (`server/cycle_engine.lua`)
+      — was missing; scheduler fired the event into the void. Now handles
+      real-time cycle completion + chunked catch-up. 5 unit tests pass.
+- [x] **Build E2E/load harness** (`resources/[meus-scripts]/qb-czcraft-e2e/`)
+      — 6 scenarios + SLO probes. Syntax-checked, not yet run against staging.
+- [ ] **Run the E2E harness against staging** (requires live FiveM + DB):
+      - [ ] `cze2e repair_natives` — vehicle repair native precondition
+      - [ ] `cze2e production_chain` — full chain + MAINTAIN_X
+      - [ ] `cze2e concurrent` — concurrency safety
+      - [ ] `cze2e failure_injection` — crash recovery + idempotency
+      - [ ] `cze2e downtime_catchup` — 24h+ catch-up
+      - [ ] `cze2e load_test` — 1000-machine/250-active SLO probes
+      - [ ] `cze2e all` — run all in order, capture raw output
 - [ ] Confirm no other resource registers `repairkit` after any future
       upstream update of qb-mechanicjob
 - [ ] Production override review: fixture caps (HOUSE=4, ORG=20) and

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useReducer, type JSX } from 'react';
+import { useCallback, useEffect, useReducer, useState, type JSX } from 'react';
 import { Sidebar, type PageId } from './components/Sidebar';
 import { ErrorBanner } from './components/ErrorBanner';
 import { Loading } from './components/Loading';
@@ -74,8 +74,29 @@ export function reducer(state: AppState, action: AppAction): AppState {
   }
 }
 
-export default function App(): JSX.Element {
+export default function App(): JSX.Element | null {
   const [state, dispatch] = useReducer(reducer, initialState);
+  const [visible, setVisible] = useState(false);
+
+  // Listen for open/close NUI messages from the client Lua.
+  // The NUI frame is always loaded; it must stay hidden until the
+  // client sends { action: 'open' } and hide again on { action: 'close' }.
+  useEffect(() => {
+    const handler = (event: MessageEvent): void => {
+      const data = event.data;
+      if (!data || typeof data.action !== 'string') return;
+      if (data.action === 'open') {
+        setVisible(true);
+        if (typeof data.machineUuid === 'string') {
+          dispatch({ type: 'SET_MACHINE', machineUuid: data.machineUuid });
+        }
+      } else if (data.action === 'close') {
+        setVisible(false);
+      }
+    };
+    window.addEventListener('message', handler);
+    return () => window.removeEventListener('message', handler);
+  }, []);
 
   const fetchOverview = useCallback(async (): Promise<void> => {
     dispatch({ type: 'SET_LOADING', loading: true });
@@ -162,10 +183,12 @@ export default function App(): JSX.Element {
     [fetchMachineData, fetchStock, fetchBills, fetchRecipes],
   );
 
-  // On mount: fetch owner overview
+  // Only fetch owner overview when the NUI becomes visible.
   useEffect(() => {
-    void fetchOverview();
-  }, [fetchOverview]);
+    if (visible) {
+      void fetchOverview();
+    }
+  }, [visible, fetchOverview]);
 
   // When machineUuid is set: fetch machine data, stock, bills, recipes
   useEffect(() => {
@@ -196,6 +219,10 @@ export default function App(): JSX.Element {
   }, []);
 
   const hasMachine = state.machineUuid !== null;
+
+  if (!visible) {
+    return null;
+  }
 
   function renderPage(): JSX.Element {
     switch (state.page) {
@@ -236,7 +263,7 @@ export default function App(): JSX.Element {
   }
 
   return (
-    <>
+    <div className="app-shell">
       <Sidebar
         currentPage={state.page}
         hasMachine={hasMachine}
@@ -254,6 +281,6 @@ export default function App(): JSX.Element {
         )}
         {state.loading ? <Loading /> : renderPage()}
       </main>
-    </>
+    </div>
   );
 }

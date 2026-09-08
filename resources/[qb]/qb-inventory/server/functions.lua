@@ -964,12 +964,12 @@ function ApplyIdempotentBatch(identifier, mutationId, removals, additions, reaso
         return { success = false, reason = 'mutationId must be a non-empty string' }
     end
 
-    local Player = exports['qb-core']:GetPlayer(identifier)
-    if not Player then
+    local player = exports['qb-core']:GetPlayer(identifier)
+    if not player then
         return { success = false, reason = 'player not found' }
     end
 
-    local citizenid = Player.PlayerData.citizenid
+    local citizenid = player.PlayerData.citizenid
     removals = removals or {}
     additions = additions or {}
 
@@ -980,7 +980,7 @@ function ApplyIdempotentBatch(identifier, mutationId, removals, additions, reaso
     if PersistPending[identifier] and PersistPending[identifier][mutationId] then
         local resultMeta = { appliedAt = os.time(), caller = caller, reason = reason }
         local persistOk = MySQL.transaction.await({
-            { query = 'UPDATE `players` SET `inventory` = ? WHERE `citizenid` = ?', values = { json.encode(serializeForSave(Player.PlayerData.items)), citizenid } },
+            { query = 'UPDATE `players` SET `inventory` = ? WHERE `citizenid` = ?', values = { json.encode(serializeForSave(player.PlayerData.items)), citizenid } },
             { query = 'UPDATE `czcraft_inventory_mutations` SET `status` = ?, `result` = ? WHERE `mutation_id` = ?', values = { 'COMMITTED', json.encode(resultMeta), mutationId } },
         })
 
@@ -1001,7 +1001,7 @@ function ApplyIdempotentBatch(identifier, mutationId, removals, additions, reaso
 
     local savedGen = InventoryGeneration[identifier] or 0
     local result = QBInventoryBatch.validateBatch(
-        Player.PlayerData.items,
+        player.PlayerData.items,
         removals,
         additions,
         { maxWeight = Config.MaxWeight, maxSlots = Config.MaxSlots },
@@ -1069,10 +1069,10 @@ function ApplyIdempotentBatch(identifier, mutationId, removals, additions, reaso
         goto retry
     end
 
-    Player.SetPlayerData('items', result.items)
+    player.SetPlayerData('items', result.items)
     bumpGeneration(identifier)
 
-    if not Player.Offline and Player(identifier).state.inv_busy then
+    if not player.Offline and Player(identifier).state.inv_busy then
         TriggerClientEvent('qb-inventory:client:updateInventory', identifier)
     end
 

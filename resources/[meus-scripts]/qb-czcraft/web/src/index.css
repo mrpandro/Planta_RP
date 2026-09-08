@@ -35,6 +35,15 @@ body {
   display: flex;
   width: 100vw;
   height: 100vh;
+  background: transparent;
+  overflow: hidden;
+}
+
+/* The app container provides the opaque background only when visible. */
+.app-shell {
+  display: flex;
+  width: 100vw;
+  height: 100vh;
   background: var(--color-bg);
   overflow: hidden;
 }

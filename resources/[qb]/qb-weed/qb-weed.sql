@@ -15,11 +15,12 @@ CREATE TABLE IF NOT EXISTS `house_plants` (
 ) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- Update January 15, 2024
-UPDATE `house_plants` SET `stage` = 1 WHERE `stage` = 'stage-a';
-UPDATE `house_plants` SET `stage` = 2 WHERE `stage` = 'stage-b';
-UPDATE `house_plants` SET `stage` = 3 WHERE `stage` = 'stage-c';
-UPDATE `house_plants` SET `stage` = 4 WHERE `stage` = 'stage-d';
-UPDATE `house_plants` SET `stage` = 5 WHERE `stage` = 'stage-e';
-UPDATE `house_plants` SET `stage` = 6 WHERE `stage` = 'stage-f';
-UPDATE `house_plants` SET `stage` = 7 WHERE `stage` = 'stage-g';
+-- CAST needed so legacy string stage values can be compared safely on MySQL 8.0.13+ strict mode
+UPDATE `house_plants` SET `stage` = 1 WHERE CAST(`stage` AS CHAR) = 'stage-a';
+UPDATE `house_plants` SET `stage` = 2 WHERE CAST(`stage` AS CHAR) = 'stage-b';
+UPDATE `house_plants` SET `stage` = 3 WHERE CAST(`stage` AS CHAR) = 'stage-c';
+UPDATE `house_plants` SET `stage` = 4 WHERE CAST(`stage` AS CHAR) = 'stage-d';
+UPDATE `house_plants` SET `stage` = 5 WHERE CAST(`stage` AS CHAR) = 'stage-e';
+UPDATE `house_plants` SET `stage` = 6 WHERE CAST(`stage` AS CHAR) = 'stage-f';
+UPDATE `house_plants` SET `stage` = 7 WHERE CAST(`stage` AS CHAR) = 'stage-g';
 ALTER TABLE `house_plants` MODIFY COLUMN `stage` int(11) DEFAULT 1;

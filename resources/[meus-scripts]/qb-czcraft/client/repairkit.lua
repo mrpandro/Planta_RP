@@ -1,8 +1,9 @@
 -- qb-czcraft repairkit client handler
 -- When the player uses a repairkit item, checks for a nearby vehicle, starts a
--- progress bar, then asks the server to validate+consume+repair. The server
--- applies the mechanical repair to the vehicle entity before sending the
--- success event; the client only plays a sound and shows a notification.
+-- progress bar, then asks the server to validate. The server tells the client
+-- to apply the repair client-side (vehicle health natives are client-side only
+-- in FiveM — they are silent no-ops on the server). The client applies the
+-- repair and sends an ack; the server consumes the item only on ack.
 
 local CZCraftClient = _G.CZCraftClient
 
@@ -28,16 +29,26 @@ local function findNearbyVehicle()
     return vehicle, netId
 end
 
--- Applies cosmetic finishing touches to the vehicle. The mechanical repair
--- (engine, body, petrol tank, wheels, windows) is applied SERVER-SIDE before
--- the success event is sent. This function only handles dirt removal and the
--- repair sound — non-critical cosmetics that are safe to skip if the event
--- is lost.
+-- Applies the mechanical repair to the vehicle entity client-side.
+-- Vehicle health natives (SetVehicleFixed, SetVehicleEngineHealth, etc.) are
+-- client-side only in FiveM — they are silent no-ops on the server.
 -- @param vehicleEntity number
-local function applyRepair(vehicleEntity)
-    -- Remove dirt.
+local function applyMechanicalRepair(vehicleEntity)
+    SetVehicleFixed(vehicleEntity)
+    SetVehicleEngineHealth(vehicleEntity, 1000.0)
+    SetVehicleBodyHealth(vehicleEntity, 1000.0)
+    SetVehiclePetrolTankHealth(vehicleEntity, 1000.0)
+    local wheelCount = GetVehicleNumberOfWheels(vehicleEntity)
+    for i = 0, wheelCount - 1 do
+        SetVehicleWheelHealth(vehicleEntity, i, 1000.0)
+        SetVehicleTyreBurst(vehicleEntity, i, false, false)
+    end
+end
+
+-- Applies cosmetic finishing touches to the vehicle (dirt removal + sound).
+-- @param vehicleEntity number
+local function applyCosmeticRepair(vehicleEntity)
     SetVehicleDirtLevel(vehicleEntity, 0.0)
-    -- Play the repair sound.
     PlayVehicleSound(vehicleEntity, 'REPAIR', 'CAR_STEREO_HUD_SOUNDS')
 end
 
@@ -139,8 +150,34 @@ AddEventHandler('qb-czcraft:client:repairkit:progress', function(data)
     end
 end)
 
--- Server says: repair succeeded (mechanical repair already applied server-side).
--- The client only applies cosmetic finishing touches (dirt + sound).
+-- Server says: apply the repair client-side, then send ack.
+-- The server has validated everything and is waiting for confirmation before
+-- consuming the item. The client applies the repair and sends an ack.
+RegisterNetEvent('qb-czcraft:client:repairkit:apply')
+AddEventHandler('qb-czcraft:client:repairkit:apply', function(data)
+    if not data or not data.vehicleNet or not data.nonce then
+        repairInProgress = false
+        CZCraftClient.QBCore.Functions.Notify('Invalid repair request', 'error')
+        return
+    end
+
+    local vehicleEntity = NetworkGetEntityFromNetworkId(data.vehicleNet)
+    if not vehicleEntity or vehicleEntity == 0 or not DoesEntityExist(vehicleEntity) then
+        repairInProgress = false
+        TriggerServerEvent('qb-czcraft:server:repairkit:cancel', { nonce = data.nonce })
+        CZCraftClient.QBCore.Functions.Notify('Vehicle no longer exists', 'error')
+        return
+    end
+
+    -- Apply the mechanical repair client-side.
+    applyMechanicalRepair(vehicleEntity)
+
+    -- Send the ack so the server consumes the item.
+    TriggerServerEvent('qb-czcraft:server:repairkit:ack', { nonce = data.nonce })
+end)
+
+-- Server says: repair succeeded (item consumed, repair confirmed).
+-- The client applies cosmetic finishing touches (dirt + sound).
 RegisterNetEvent('qb-czcraft:client:repairkit:success')
 AddEventHandler('qb-czcraft:client:repairkit:success', function(data)
     repairInProgress = false
@@ -156,7 +193,7 @@ AddEventHandler('qb-czcraft:client:repairkit:success', function(data)
         return
     end
 
-    applyRepair(vehicleEntity)
+    applyCosmeticRepair(vehicleEntity)
     CZCraftClient.QBCore.Functions.Notify('Vehicle repaired', 'success')
 end)
 

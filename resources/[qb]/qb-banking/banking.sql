@@ -4,7 +4,7 @@ CREATE TABLE IF NOT EXISTS `bank_accounts` (
   `account_name` varchar(50) DEFAULT NULL,
   `account_balance` int(11) NOT NULL DEFAULT 0,
   `account_type` enum('shared','job','gang') NOT NULL,
-  `users` longtext DEFAULT '[]',
+  `users` longtext DEFAULT ('[]'),
   PRIMARY KEY (`id`) USING BTREE,
   UNIQUE KEY `account_name` (`account_name`)
 ) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

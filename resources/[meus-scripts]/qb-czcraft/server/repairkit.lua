@@ -1,13 +1,28 @@
 -- qb-czcraft repairkit server handler
--- Server-authoritative repairkit: the client shows a progress bar, then the
--- server revalidates entity/distance/item, consumes the item, and applies the
--- repair to the vehicle entity SERVER-SIDE before notifying the client.
+-- Server-authoritative repairkit with pending-repair-ack flow.
 --
--- Security: every step revalidates source, vehicle entity, distance, item
--- presence, and rate limit. Duplicate requests within the cooldown are rejected.
--- The repair is applied server-side BEFORE the success event is sent, so a
--- connection drop between the two leaves the vehicle repaired and the item
--- consumed — no player-side data loss window.
+-- Design (ADR-001, revised after live staging diagnostic):
+-- Vehicle repair natives (SetVehicleFixed, SetVehicleEngineHealth, etc.) are
+-- silent no-ops server-side in FiveM — the calls succeed but have no effect.
+-- Vehicle health is a client-side concept. The original design (repair applied
+-- server-side before item consumption) was based on a false premise.
+--
+-- The revised flow:
+-- 1. Client uses repairkit → server validates entity/distance/item, creates
+--    a pending-repair session (nonce + timeout).
+-- 2. Client shows progress bar, sends 'complete' on finish.
+-- 3. Server revalidates, marks the session as pending-apply, tells the client
+--    to apply the repair client-side.
+-- 4. Client applies the repair (SetVehicleFixed, etc.) and sends 'ack'.
+-- 5. Server consumes the item ONLY on ack.
+-- 6. If ack doesn't arrive within ACK_TIMEOUT_MS, the server clears the
+--    pending state without consuming the item.
+--
+-- Safety property: the item is consumed only if the client confirms the
+-- repair was applied. A connection drop between steps 4 and 5 leaves the
+-- vehicle repaired (client-side) but the item NOT consumed — the player can
+-- retry. This is a reconciled client-trust step, not the original blind
+-- "cosmetic-only" version.
 
 CZCraft = CZCraft or {}
 
@@ -18,11 +33,14 @@ local REPAIRKIT_ITEM = 'repairkit'
 local MAX_VEHICLE_DISTANCE = 5.0  -- meters from the player ped to the vehicle
 local PROGRESS_DURATION_MS = 10000  -- 10 second progress bar
 local REQUEST_COOLDOWN_MS = 12000  -- cooldown between repair requests (must exceed progress)
+local ACK_TIMEOUT_MS = 5000  -- max time to wait for client repair ack
 
 -- Tracks the last repair request time per player to prevent duplicate/spam.
 local lastRequestTime = {}
 
--- Tracks active repair sessions: source -> { vehicleNet, startedAt, nonce }
+-- Tracks active repair sessions: source -> { vehicleNet, startedAt, nonce, stage }
+-- stage: 'progress' -> waiting for complete event
+--        'pending-apply' -> waiting for client ack
 local activeSessions = {}
 
 -- Generates a unique nonce for each repair session.
@@ -64,7 +82,8 @@ local function validateVehicle(source, vehicleNet)
     end
 
     -- Verify it's actually a vehicle.
-    if GetEntityType(vehicleEntity) ~= 3 then  -- 3 = vehicle in FiveM
+    -- GetEntityType: 1=ped, 2=vehicle, 3=object.
+    if GetEntityType(vehicleEntity) ~= 2 then
         return false, 'entity is not a vehicle'
     end
 
@@ -88,22 +107,6 @@ local function validateVehicle(source, vehicleNet)
     return true, nil
 end
 
--- Applies the mechanical repair to the vehicle entity server-side.
--- This runs BEFORE the success event is sent, so even if the client never
--- receives the event (connection drop), the vehicle is already repaired.
--- @param vehicleEntity number
-local function applyServerSideRepair(vehicleEntity)
-    SetVehicleFixed(vehicleEntity)
-    SetVehicleEngineHealth(vehicleEntity, 1000.0)
-    SetVehicleBodyHealth(vehicleEntity, 1000.0)
-    SetVehiclePetrolTankHealth(vehicleEntity, 1000.0)
-    local wheelCount = GetVehicleNumberOfWheels(vehicleEntity)
-    for i = 0, wheelCount - 1 do
-        SetVehicleWheelHealth(vehicleEntity, i, 1000.0)
-        SetVehicleTyreBurst(vehicleEntity, i, false, false)
-    end
-end
-
 -- ===========================================================================
 -- Repair flow:
 -- 1. Client uses repairkit item -> QBCore:Client:UseItem -> client/repairkit.lua
@@ -112,8 +115,10 @@ end
 -- 4. Server validates entity/distance/item, creates a session with a nonce
 -- 5. Client shows progress bar for PROGRESS_DURATION_MS
 -- 6. Client sends 'qb-czcraft:server:repairkit:complete' with nonce
--- 7. Server revalidates everything, consumes the item, applies the repair
---    server-side, then sends success (cosmetic notification only)
+-- 7. Server revalidates, marks pending-apply, tells client to apply repair
+-- 8. Client applies repair client-side, sends 'qb-czcraft:server:repairkit:ack'
+-- 9. Server consumes item on ack, sends success
+-- 10. If ack doesn't arrive within ACK_TIMEOUT_MS, server clears session (no consumption)
 -- ===========================================================================
 
 -- Step 1: Start — validate and create a session.
@@ -168,6 +173,7 @@ AddEventHandler('qb-czcraft:server:repairkit:start', function(vehicleNet)
         vehicleNet = tonumber(vehicleNet),
         startedAt = now,
         nonce = nonce,
+        stage = 'progress',
     }
     lastRequestTime[src] = now
 
@@ -178,7 +184,7 @@ AddEventHandler('qb-czcraft:server:repairkit:start', function(vehicleNet)
     })
 end)
 
--- Step 2: Complete — revalidate, consume item, confirm repair.
+-- Step 2: Complete — revalidate, tell client to apply repair.
 RegisterNetEvent('qb-czcraft:server:repairkit:complete')
 AddEventHandler('qb-czcraft:server:repairkit:complete', function(data)
     local src = source
@@ -207,6 +213,10 @@ AddEventHandler('qb-czcraft:server:repairkit:complete', function(data)
         TriggerClientEvent('qb-czcraft:client:repairkit:fail', src, 'invalid session nonce')
         return
     end
+    if session.stage ~= 'progress' then
+        TriggerClientEvent('qb-czcraft:client:repairkit:fail', src, 'session is not in progress stage')
+        return
+    end
 
     -- Check the progress duration has elapsed (prevent instant completion exploits).
     local elapsed = GetGameTimer() - session.startedAt
@@ -224,7 +234,65 @@ AddEventHandler('qb-czcraft:server:repairkit:complete', function(data)
         return
     end
 
-    -- Revalidate the player still has the item (may have been used/consumed elsewhere).
+    -- Revalidate the player still has the item.
+    local playerData = CZCraft.QBCoreAdapter.getPlayerData(src)
+    if not playerData then
+        activeSessions[src] = nil
+        TriggerClientEvent('qb-czcraft:client:repairkit:fail', src, 'player not found')
+        return
+    end
+    if not hasRepairkit(playerData) then
+        activeSessions[src] = nil
+        TriggerClientEvent('qb-czcraft:client:repairkit:fail', src, 'no repairkit in inventory')
+        return
+    end
+
+    -- Mark the session as pending-apply and tell the client to apply the repair.
+    session.stage = 'pending-apply'
+    session.pendingAt = GetGameTimer()
+
+    -- Start a timeout thread: if ack doesn't arrive, clear the session.
+    CreateThread(function()
+        Wait(ACK_TIMEOUT_MS)
+        local s = activeSessions[src]
+        if s and s.nonce == session.nonce and s.stage == 'pending-apply' then
+            activeSessions[src] = nil
+            TriggerClientEvent('qb-czcraft:client:repairkit:fail', src, 'repair ack timeout — item not consumed')
+        end
+    end)
+
+    -- Tell the client to apply the repair client-side.
+    TriggerClientEvent('qb-czcraft:client:repairkit:apply', src, {
+        vehicleNet = session.vehicleNet,
+        nonce = data.nonce,
+    })
+end)
+
+-- Step 3: Ack — client confirms the repair was applied, consume the item.
+RegisterNetEvent('qb-czcraft:server:repairkit:ack')
+AddEventHandler('qb-czcraft:server:repairkit:ack', function(data)
+    local src = source
+
+    if type(data) ~= 'table' or type(data.nonce) ~= 'string' then
+        TriggerClientEvent('qb-czcraft:client:repairkit:fail', src, 'invalid ack')
+        return
+    end
+
+    local session = activeSessions[src]
+    if not session then
+        TriggerClientEvent('qb-czcraft:client:repairkit:fail', src, 'no active repair session')
+        return
+    end
+    if session.nonce ~= data.nonce then
+        TriggerClientEvent('qb-czcraft:client:repairkit:fail', src, 'invalid session nonce')
+        return
+    end
+    if session.stage ~= 'pending-apply' then
+        TriggerClientEvent('qb-czcraft:client:repairkit:fail', src, 'session is not pending-apply')
+        return
+    end
+
+    -- Revalidate the player still has the item (may have been used elsewhere).
     local playerData = CZCraft.QBCoreAdapter.getPlayerData(src)
     if not playerData then
         activeSessions[src] = nil
@@ -255,19 +323,10 @@ AddEventHandler('qb-czcraft:server:repairkit:complete', function(data)
     -- Trigger the item box animation on the client.
     TriggerClientEvent('inventory:client:ItemBox', src, QBCore.Shared.Items[REPAIRKIT_ITEM], 'remove')
 
-    -- Apply the repair SERVER-SIDE before notifying the client. This eliminates
-    -- the item-loss window: if the success event never reaches the client
-    -- (connection drop), the vehicle is already repaired and the item is consumed.
-    local vehicleEntity = NetworkGetEntityFromNetworkId(session.vehicleNet)
-    if vehicleEntity and vehicleEntity ~= 0 and DoesEntityExist(vehicleEntity) then
-        applyServerSideRepair(vehicleEntity)
-    end
-
     -- Clear the session.
     activeSessions[src] = nil
 
-    -- Notify the client — cosmetic only (sound + notification). The repair is
-    -- already applied server-side.
+    -- Notify the client — cosmetic only (sound + notification).
     TriggerClientEvent('qb-czcraft:client:repairkit:success', src, {
         vehicleNet = session.vehicleNet,
         nonce = data.nonce,
@@ -298,6 +357,7 @@ end)
 Repairkit.REPAIRKIT_ITEM = REPAIRKIT_ITEM
 Repairkit.PROGRESS_DURATION_MS = PROGRESS_DURATION_MS
 Repairkit.MAX_VEHICLE_DISTANCE = MAX_VEHICLE_DISTANCE
+Repairkit.ACK_TIMEOUT_MS = ACK_TIMEOUT_MS
 
 CZCraft.Repairkit = Repairkit
 return Repairkit

@@ -125,6 +125,9 @@ These resources were updated upstream, which **overwrote your manual security pa
 ## 5. Recommended Next Steps
 
 1. **Start the server in dev mode** and check console for missing config errors.
+   - DB tables are now imported (07 Sep 2026) — the `bank_accounts`, `inventories`,
+     `lapraces` and all other standard qb-core tables are present. See
+     `UPDATE_LOG.md` for details.
 2. **Test these resources first:**
    - `qb-target` (new config structure)
    - `qb-phone` (major version bump)

@@ -1,3 +1,6 @@
+QBCore = QBCore or {}
+QBCore.Config = QBConfig
+QBCore.PlayerData = QBCore.PlayerData or {}
 QBCore.Shared = {}
 QBCore.ClientCallbacks = {}
 QBCore.ServerCallbacks = {}

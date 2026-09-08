@@ -296,5 +296,124 @@ function CyclesRepo.listDueMachines(nowIso, limit)
     ]], { nowIso, limit or 100 }) or {}
 end
 
+-- Applies a catch-up chunk: N cycles' net stock deltas + one aggregated
+-- production event + machine next_due_at advance, all in ONE transaction.
+-- Catch-up cycles are instantly complete (no active-cycle row, no reservation
+-- dance): inputs are consumed and outputs produced directly. Idempotent via
+-- the idempotency_key on czcraft_production_events — a replay (same chunk
+-- sequence) commits as a no-op because the event INSERT hits the unique key
+-- and returns affected = 0, which gates all side effects (same pattern as
+-- complete()).
+--
+-- @param params table {
+--   machine_uuid, bill_id?, recipe = { inputs, outputs },
+--   cycles_to_run number (N), chunk_sequence number,
+--   chunk_started_at number (unix seconds), chunk_ended_at number (unix seconds),
+--   next_due_at number (unix seconds — lastCompletedAt + N * duration),
+--   standard_cost number, idempotency_key string,
+-- }
+-- @return boolean ok
+-- @return string|nil error
+function CyclesRepo.applyCatchUpChunk(params)
+    local n = params.cycles_to_run
+    if not n or n <= 0 then
+        return true, nil
+    end
+
+    local startedAtIso = os.date('!%Y-%m-%d %H:%M:%S.000', params.chunk_started_at)
+    local endedAtIso = os.date('!%Y-%m-%d %H:%M:%S.000', params.chunk_ended_at)
+    local nextDueIso = os.date('!%Y-%m-%d %H:%M:%S.000', params.next_due_at)
+
+    local recipe = params.recipe
+
+    -- Build net stock delta statements.
+    -- Inputs: quantity -= amount * N (guarded so quantity stays >= 0).
+    -- Outputs: upsert — quantity += amount * N (inserts the row if absent).
+    local deltaStatements = {}
+    local deltaArgs = {}
+
+    if type(recipe.inputs) == 'table' then
+        for _, line in ipairs(recipe.inputs) do
+            local total = line.amount * n
+            deltaStatements[#deltaStatements + 1] = [[
+                UPDATE `czcraft_machine_stock`
+                SET `quantity` = `quantity` - ?,
+                    `version` = `version` + 1
+                WHERE `machine_uuid` = ? AND `item_name` = ? AND `metadata_key` = ''
+                  AND `quantity` - ? >= 0
+            ]]
+            deltaArgs[#deltaArgs + 1] = { total, params.machine_uuid, line.item, total }
+        end
+    end
+
+    if type(recipe.outputs) == 'table' then
+        for _, line in ipairs(recipe.outputs) do
+            local total = line.amount * n
+            deltaStatements[#deltaStatements + 1] = [[
+                INSERT INTO `czcraft_machine_stock`
+                    (`machine_uuid`, `item_name`, `metadata_key`, `quantity`,
+                     `reserved_quantity`, `standard_unit_cost`)
+                VALUES (?, ?, '', ?, 0, 0)
+                ON DUPLICATE KEY UPDATE
+                    `quantity` = `quantity` + VALUES(`quantity`),
+                    `version` = `version` + 1
+            ]]
+            deltaArgs[#deltaArgs + 1] = { params.machine_uuid, line.item, total }
+        end
+    end
+
+    -- Aggregated production event (idempotent via unique idempotency_key).
+    local inputsJson = json.encode(recipe.inputs or {})
+    local outputsJson = json.encode(recipe.outputs or {})
+    local eventUuid = params.event_id or params.idempotency_key
+    local insertEventStatement = [[
+        INSERT INTO `czcraft_production_events`
+            (`event_id`, `machine_uuid`, `bill_id`, `cycles_completed`,
+             `inputs`, `outputs`, `cost`, `started_at`, `ended_at`,
+             `idempotency_key`, `status`)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'COMMITTED')
+        ON DUPLICATE KEY UPDATE `event_id` = `event_id`
+    ]]
+    local insertEventArgs = {
+        eventUuid, params.machine_uuid, params.bill_id, n,
+        inputsJson, outputsJson, params.standard_cost or 0,
+        startedAtIso, endedAtIso, params.idempotency_key,
+    }
+
+    -- Advance the machine's next_due_at (the catch-up cursor).
+    local updateMachineStatement = [[
+        UPDATE `czcraft_machines`
+        SET `next_due_at` = ?,
+            `operational_status` = 'STOPPED',
+            `active_cycle_id` = NULL,
+            `version` = `version` + 1
+        WHERE `machine_uuid` = ?
+    ]]
+    local updateMachineArgs = { nextDueIso, params.machine_uuid }
+
+    local ok, err = pcall(function()
+        MySQL.transaction.await(function()
+            -- 1. Insert the aggregated event (idempotent). Gate side effects on
+            --    affected count, exactly like complete(): a replayed chunk is a
+            --    committed no-op, not a double-produce.
+            local eventAffected = MySQL.update(insertEventStatement, insertEventArgs)
+            if eventAffected == 0 then
+                return
+            end
+            -- 2. Apply net stock deltas.
+            for i = 1, #deltaStatements do
+                MySQL.update(deltaStatements[i], deltaArgs[i])
+            end
+            -- 3. Advance the machine cursor.
+            MySQL.update(updateMachineStatement, updateMachineArgs)
+        end)
+    end)
+
+    if not ok then
+        return false, tostring(err)
+    end
+    return true, nil
+end
+
 CZCraft.CyclesRepo = CyclesRepo
 return CyclesRepo

@@ -29,14 +29,39 @@
   - Cycle completion side-effect gating on dedup-key affected count
   - NUI + repairkit split into separate commits for bisectability
   - Web test coverage expanded: reducers, forms, block states, permissions
+- **Cycle engine (processMachine handler)** — NEW
+  - `server/cycle_engine.lua`: the per-machine orchestrator that the scheduler
+    tick fires via `qb-czcraft:internal:processMachine`. Connects the pure
+    domain (bills, production, catch-up) to the repositories.
+  - Two modes: real-time cycle completion + chunked catch-up.
+  - `CyclesRepo.applyCatchUpChunk`: one-transaction-per-chunk batch catch-up
+    (net stock deltas + aggregated production event + machine cursor advance).
+  - `MachinesRepo.setBlocked` + `clearNextDue` helpers.
+  - 5 unit tests (mock repo layer) covering both modes + block/idle paths.
+  - This was previously missing — the scheduler fired `processMachine` into
+    the void. STATUS.md/TODO.md had incorrectly listed Part 4 as complete.
+- **E2E/load harness** — NEW (`resources/[meus-scripts]/qb-czcraft-e2e/`)
+  - 6 scenarios: repair_natives, production_chain, concurrent,
+    failure_injection, downtime_catchup, load_test.
+  - SLO measurement utilities (p95/p99/max, Lua stall detector).
+  - Raw output (not just pass/fail). See its README.md.
 
 ## Remaining before v0.1 E2E gate
 
-- Full staging E2E test (placement → bill → cycle → stock → NUI → repairkit)
-- Verify server-side vehicle repair natives work correctly in FiveM runtime
+- **Run the E2E harness against staging** (requires live FiveM server + DB):
+  - `cze2e repair_natives` — vehicle repair native precondition
+  - `cze2e production_chain` — full chain + MAINTAIN_X
+  - `cze2e concurrent` — concurrency safety
+  - `cze2e failure_injection` — crash recovery + idempotency
+  - `cze2e downtime_catchup` — 24h+ catch-up
+  - `cze2e load_test` — 1000-machine/250-active SLO probes
+  - `cze2e all` — run all in order
 - Verify no other resource registers `repairkit` (check after any upstream update)
 - Production override review for fixture caps and maxBillsPerMachine
 
 ## Blockers
 
-None.
+None (code-complete). The gate is now blocked on **staging execution**, not
+implementation. All harness scenarios are built and syntax-checked; the cycle
+engine has unit-test coverage. The gate cannot close until the harness is run
+against a real FiveM server + database and the raw output confirms the SLOs.

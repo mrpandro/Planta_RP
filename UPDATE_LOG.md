@@ -1,6 +1,63 @@
 # Planta RP - Resource Update Log
 
-## Last Update: 21 Jun 2026
+## Last Update: 07 Sep 2026
+
+---
+
+## 07 Sep 2026 — Database Schema Import + MySQL 9.7 Compatibility Fixes
+
+### Problem
+The `qbcore` database was missing all standard qb-core resource tables. Only the
+`czcraft_*` tables (from `qb-czcraft/001_v0_1_core.sql`) and `prp_anticheat_bans`
+existed. This caused runtime errors on server startup:
+
+- `Table 'qbcore.bank_accounts' doesn't exist` (qb-banking)
+- `Table 'qbcore.inventories' doesn't exist` (qb-inventory)
+- `Table 'qbcore.lapraces' doesn't exist` (qb-lapraces)
+
+### What Was Done
+Imported all SQL files from the resource tree into the `qbcore` database:
+
+| SQL File | Tables Created |
+|----------|---------------|
+| `qb-core/qbcore.sql` | `players`, `bans`, `player_contacts`, `player_mails`, `player_logs` |
+| `qb-apartments/qb-apartments.sql` | `apartments` |
+| `qb-banking/banking.sql` | `bank_accounts`, `bank_statements` |
+| `qb-crypto/qb-crypto.sql` | `crypto`, `crypto_transactions` |
+| `qb-drugs/qb-drugs.sql` | `dealers` |
+| `qb-garages/player_vehicles.sql` | `player_vehicles` |
+| `qb-houses/qb-houses.sql` | `houselocations`, `player_houses` |
+| `qb-inventory/qb-inventory.sql` | `inventories` |
+| `qb-lapraces/qb-lapraces.sql` | `lapraces` |
+| `qb-phone/qb-phone.sql` | `phone_messages`, `phone_invoices`, `phone_gallery`, `phone_tweets` |
+| `qb-vehiclesales/qb-vehiclesales.sql` | `occasion_vehicles` |
+| `qb-vehicleshop/vehshop.sql` | FK + finance columns on `player_vehicles` |
+| `qb-weed/qb-weed.sql` | `house_plants` |
+| `illenium-appearance/sql/*.sql` | `playerskins`, `player_outfits`, `player_outfit_codes`, `management_outfits` |
+
+**Skipped:** `qb-inventory/migrate.sql` — data migration from old `gloveboxitems`/
+`stashitems`/`trunkitems` tables, which don't exist on a fresh install.
+
+### MySQL 9.7 Compatibility Fixes (5 files patched)
+
+The server runs MySQL 9.7, which is stricter than the MySQL 5.7/MariaDB these
+qb-core SQL files were originally written for. Five files required patches:
+
+| File | Problem | Fix |
+|------|---------|-----|
+| `qb-banking/banking.sql` | `longtext DEFAULT '[]'` — TEXT columns can't have literal defaults in MySQL 8.0.13+ | `DEFAULT ('[]')` (expression default) |
+| `qb-houses/qb-houses.sql` | `text DEFAULT '...'` — same issue | `DEFAULT ('...')` |
+| `qb-phone/qb-phone.sql` | `text DEFAULT '...'` — same issue | `DEFAULT ('...')` |
+| `qb-vehicleshop/vehshop.sql` | FK collation mismatch (`utf8mb4_unicode_ci` vs `utf8mb4_0900_ai_ci`) + non-idempotent ALTERs | Aligned `citizenid` collation + information_schema guards |
+| `qb-weed/qb-weed.sql` | `WHERE stage = 'stage-a'` on int column fails in strict mode | `WHERE CAST(stage AS CHAR) = 'stage-a'` |
+
+### Result
+Database now has 37 tables. All three reported errors are resolved. Server
+should start without "table doesn't exist" errors after restart.
+
+---
+
+## 21 Jun 2026 — QBCore Resource Update + Security Patches
 
 ---
 
@@ -109,11 +166,13 @@ Copy-Item '<resource>-backup/locales/pt.lua' 'resources/[qb]/<resource>/locales/
 
 ## Remaining Tasks
 
+- [x] Import all qb-core resource SQL files into `qbcore` database (done 07 Sep 2026)
 - [ ] Test server startup and player login with updated qb-core
 - [ ] Test inventory (ID cards, driver licenses)
 - [ ] Test banking transfers
 - [ ] Test phone apps
 - [ ] Test boss menus (qb-management)
+- [ ] Re-apply security patches to `qb-management` and `ps-adminmenu`
 - [ ] Proceed with full security audit once updates are stable
 
 ---

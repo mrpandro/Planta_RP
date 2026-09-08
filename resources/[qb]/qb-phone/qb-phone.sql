@@ -96,7 +96,7 @@ CREATE TABLE IF NOT EXISTS `phone_tweets` (
   `message` text DEFAULT NULL,
   `date` datetime DEFAULT current_timestamp(),
   `url` text DEFAULT NULL,
-  `picture` text DEFAULT './img/default.png',
+  `picture` text DEFAULT ('./img/default.png'),
   `tweetId` varchar(25) NOT NULL,
   PRIMARY KEY (`id`),
   KEY `citizenid` (`citizenid`)

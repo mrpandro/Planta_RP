@@ -158,7 +158,7 @@ QBCore.Shared.Jobs = {
         },
     },
     beeker = {
-        label = 'Beeker''s Garage',
+        label = 'Beeker\'s Garage',
         type = 'mechanic',
         defaultDuty = true,
         offDutyPay = false,

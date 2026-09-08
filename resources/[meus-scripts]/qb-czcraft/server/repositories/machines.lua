@@ -140,5 +140,48 @@ function MachinesRepo.setOperationalStatus(machineUuid, status, expectedVersion)
     return affected and affected > 0
 end
 
+-- Marks a machine BLOCKED with a reason/detail and clears next_due_at so the
+-- scheduler stops popping it. The machine is re-heaped by an explicit wake
+-- event (stock deposit, bill create/resume, recipe re-enable).
+-- @param machineUuid string
+-- @param reason string short block reason
+-- @param detail string|nil longer detail
+-- @param expectedVersion number
+-- @return boolean ok
+function MachinesRepo.setBlocked(machineUuid, reason, detail, expectedVersion)
+    local affected = MySQL.update.await([[
+        UPDATE `czcraft_machines`
+        SET `operational_status` = 'BLOCKED',
+            `blocked_reason` = ?,
+            `blocked_detail` = ?,
+            `next_due_at` = NULL,
+            `active_cycle_id` = NULL,
+            `version` = `version` + 1
+        WHERE `machine_uuid` = ? AND `version` = ?
+    ]], { reason, detail, machineUuid, expectedVersion })
+    return affected and affected > 0
+end
+
+-- Clears next_due_at and any block state, setting the machine STOPPED/idle.
+-- Used when a machine has no runnable bill (e.g. PRODUCE_X completed) so the
+-- scheduler stops popping it until a wake event re-heaps it.
+-- @param machineUuid string
+-- @param expectedVersion number
+-- @return boolean ok
+function MachinesRepo.clearNextDue(machineUuid, expectedVersion)
+    local affected = MySQL.update.await([[
+        UPDATE `czcraft_machines`
+        SET `next_due_at` = NULL,
+            `operational_status` = 'STOPPED',
+            `blocked_reason` = NULL,
+            `blocked_detail` = NULL,
+            `active_cycle_id` = NULL,
+            `active_bill_id` = NULL,
+            `version` = `version` + 1
+        WHERE `machine_uuid` = ? AND `version` = ?
+    ]], { machineUuid, expectedVersion })
+    return affected and affected > 0
+end
+
 CZCraft.MachinesRepo = MachinesRepo
 return MachinesRepo

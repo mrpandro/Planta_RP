@@ -26,7 +26,7 @@ local suiteExcludePattern = os.getenv("TEST_SUITE_EXCLUDE_PATTERN")
 if suiteExcludePattern and suiteExcludePattern ~= "" then
     local filtered = {}
     for _, suiteFile in ipairs(suiteFiles) do
-        if not string.find(suiteFile, suiteExcludePattern) then
+        if not string.find(suiteFile, suiteExcludePattern, 1, true) then
             filtered[#filtered + 1] = suiteFile
         end
     end

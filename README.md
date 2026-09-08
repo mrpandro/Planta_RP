@@ -62,8 +62,37 @@ Agora edita `server.cfg` com os teus valores reais:
 | `sv_maxclients` | Número máximo de jogadores (padrão: 48) |
 | `sv_licenseKey` | Obtém em https://keymaster.fivem.net |
 | `steam_webApiKey` | Obtém em https://steamcommunity.com/dev/apikey |
+| `mysql_connection_string` | String de ligação à BD (ex: `mysql://root:password@127.0.0.1:3306/qbcore?charset=utf8mb4`) |
 
-### 3. Estrutura de pastas e ordem de início
+### 3. Configurar a base de dados
+
+Cria a base de dados `qbcore` e importa todos os ficheiros SQL dos recursos:
+
+```powershell
+# Cria a base de dados
+mysql -u root -p -e "CREATE DATABASE IF NOT EXISTS qbcore DEFAULT CHARSET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+
+# Importa o core primeiro
+mysql -u root -p qbcore < "resources/[qb]/qb-core/qbcore.sql"
+
+# Importa todos os recursos qb-*
+Get-ChildItem "resources/[qb]/*/qb-*.sql", "resources/[qb]/*/banking.sql", "resources/[qb]/*/vehshop.sql", "resources/[qb]/*/player_vehicles.sql" | ForEach-Object {
+    mysql -u root -p qbcore < $_.FullName
+}
+
+# Importa illenium-appearance
+Get-ChildItem "resources/[qb]/illenium-appearance/sql/*.sql" | ForEach-Object {
+    mysql -u root -p qbcore < $_.FullName
+}
+```
+
+> **Aviso (MySQL 8.0.13+):** Alguns ficheiros SQL do QBCore usam `DEFAULT 'valor'`
+> em colunas TEXT, o que não é permitido. Se encontrares erros do tipo
+> `BLOB/TEXT/GEOMETRY column can't have a default value`, substitui por
+> `DEFAULT ('valor')` (parênteses = expressão default, suportado desde 8.0.13).
+> Os ficheiros neste repositório já foram corrigidos (07 Sep 2026).
+
+### 4. Estrutura de pastas e ordem de início
 
 O servidor garante que os recursos iniciam nesta ordem:
 

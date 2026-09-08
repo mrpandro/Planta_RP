@@ -1,0 +1,3259 @@
+==============================================================================
+resources\[meus-scripts]\qb-czcraft\config\access.lua
+==============================================================================
+       -- qb-czcraft access configuration
+       -- Owner/permission vocabulary, empty deny-all grade grant maps, and the documented
+       -- ORG_WEAPONS organization allow-list. The allow-list establishes catalog eligibility
+       -- only; no grade receives operational permissions until the owner/access policy task
+       -- supplies reviewed mappings.
+
+     2 CZCraft.Config = CZCraft.Config or {}
+
+     2 CZCraft.Config.Access = {
+           -- Owner types accepted by the access system.
+     2     ownerTypes = {
+     2         CZCraft.OwnerType.PLAYER,
+     2         CZCraft.OwnerType.JOB,
+     2         CZCraft.OwnerType.GANG,
+     2     },
+
+           -- The six industrial permissions. Grade grants map to these keys.
+     2     permissions = {
+     2         CZCraft.Permission.OWNER,
+     2         CZCraft.Permission.MANAGER,
+     2         CZCraft.Permission.PRODUCTION,
+     2         CZCraft.Permission.WITHDRAW,
+     2         CZCraft.Permission.DEPOSIT,
+     2         CZCraft.Permission.VIEW,
+     2     },
+
+           -- Grade-to-permission grants for jobs. Empty = deny-all at scaffold time.
+           -- Reviewed mappings are supplied by the owner/access policy task.
+     2     jobGrades = {},
+
+           -- Grade-to-permission grants for gangs. Empty = deny-all at scaffold time.
+     2     gangGrades = {},
+
+           -- Access tags and their organization allow-lists.
+           -- ORG_WEAPONS allows job police and the documented gangs; this does not itself
+           -- grant any of the six permissions — it only establishes recipe eligibility.
+     2     tags = {
+     2         CIVIL = {
+     2             jobs = {},
+     2             gangs = {},
+     2         },
+     2         ORG_WEAPONS = {
+     2             jobs = { 'police' },
+     2             gangs = { 'lostmc', 'ballas', 'vagos', 'cartel', 'families', 'triads' },
+     2         },
+     2     },
+     2 }
+
+==============================================================================
+resources\[meus-scripts]\qb-czcraft\config\general.lua
+==============================================================================
+       -- qb-czcraft general configuration
+       -- v0.1 foundation: all gameplay flags disabled, fixture caps as pre-gate defaults,
+       -- and required production overrides represented as explicit unresolved sentinels.
+
+     2 CZCraft.Config = CZCraft.Config or {}
+
+     2 CZCraft.Config.General = {
+     2     resourceName = 'qb-czcraft',
+     2     version = '0.1.0',
+
+           -- v0.1 feature flags. Every gameplay flag is disabled at scaffold time.
+           -- The resource loads and validates but registers no mutation surface.
+     2     features = {
+     2         placement = true,
+     2         storageTransfers = false,
+     2         bills = true,
+     2         production = true,
+     2         scheduler = true,
+     2         nui = true,
+     2         repairkit = true,
+     2         admin = false,
+     2     },
+
+           -- Fixture location caps are pre-gate test defaults explicitly called out by the spec.
+           -- Production overrides still require review before the v0.1 gate.
+     2     fixtureCaps = {
+     2         HOUSE = 4,
+     2         ORG = 20,
+     2     },
+
+           -- Maximum bills per machine. Pre-gate default; production may override before the v0.1 gate.
+     2     maxBillsPerMachine = 5,
+     2 }
+
+==============================================================================
+resources\[meus-scripts]\qb-czcraft\config\machines.lua
+==============================================================================
+       -- qb-czcraft machine definitions
+       -- Four MVP machines with documented hardware prices, stock capacities (kg -> grams),
+       -- selected placeholder prop models, and resolved balance overrides for item weight
+       -- and placement clearance. Values are pre-gate defaults; production may override
+       -- before the v0.1 gate.
+
+     4 CZCraft.Config = CZCraft.Config or {}
+
+     4 CZCraft.Config.Machines = {
+           {
+     4         type = CZCraft.MachineType.WORKBENCH,
+     4         displayKey = 'machine.workbench.name',
+     4         item = 'cz_workbench_machine',
+     4         price = 5000,
+               -- 100 kg -> 100,000 g
+     4         stockCapacity = 100000,
+     4         prop = 'prop_tool_bench02',
+               -- Packed item weight in grams (matches qb-core/shared/items.lua).
+     4         itemWeight = 10000,
+               -- Placement clearance in meters.
+     4         placementClearance = 1.5,
+     4     },
+           {
+     4         type = CZCraft.MachineType.REFINERY,
+     4         displayKey = 'machine.refinery.name',
+     4         item = 'cz_refinery_machine',
+     4         price = 15000,
+               -- 250 kg -> 250,000 g
+     4         stockCapacity = 250000,
+     4         prop = 'gr_prop_gr_bench_01a',
+     4         itemWeight = 20000,
+     4         placementClearance = 2.0,
+     4     },
+           {
+     4         type = CZCraft.MachineType.FABRICATOR,
+     4         displayKey = 'machine.fabricator.name',
+     4         item = 'cz_fabricator_machine',
+     4         price = 25000,
+               -- 200 kg -> 200,000 g
+     4         stockCapacity = 200000,
+     4         prop = 'gr_prop_gr_bench_03a',
+     4         itemWeight = 20000,
+     4         placementClearance = 2.0,
+     4     },
+           {
+     4         type = CZCraft.MachineType.ASSEMBLY,
+     4         displayKey = 'machine.assembly.name',
+     4         item = 'cz_assembly_machine',
+     4         price = 40000,
+               -- 300 kg -> 300,000 g
+     4         stockCapacity = 300000,
+     4         prop = 'prop_tool_bench02_ld',
+     4         itemWeight = 30000,
+     4         placementClearance = 2.5,
+           },
+     4 }
+
+==============================================================================
+resources\[meus-scripts]\qb-czcraft\config\plots.lua
+==============================================================================
+       -- qb-czcraft ORG plot configuration
+       -- Intentionally empty at scaffold time. The docs require staging to provide a real
+       -- ORG polygon later and prohibit inventing production coordinates. The validator
+       -- accepts an empty collection; entries are validated only when present.
+
+     4 CZCraft.Config = CZCraft.Config or {}
+
+     4 CZCraft.Config.Plots = {}
+
+==============================================================================
+resources\[meus-scripts]\qb-czcraft\config\recipes.lua
+==============================================================================
+       -- qb-czcraft recipe catalog
+       -- Exact ordered 15-recipe MVP catalog from recipes-config.md.
+       -- Ordered list so duplicate IDs can be detected and stable order preserved.
+       -- 12 CIVIL + 3 ORG_WEAPONS. No legacy qb-crafting recipes.
+
+     8 CZCraft.Config = CZCraft.Config or {}
+
+     8 CZCraft.Config.Recipes = {
+           -- Refinery: resources -> processed
+           {
+     8         id = 'reclaim_iron',
+     8         machine = CZCraft.MachineType.REFINERY,
+     8         duration = 45,
+     8         enabled = true,
+     8         access = CZCraft.AccessTag.CIVIL,
+     8         inputs = {
+     8             { item = 'metalscrap', amount = 5 },
+     8         },
+     8         outputs = {
+     8             { item = 'iron', amount = 2 },
+     8         },
+     8         primaryOutput = 'iron',
+     8     },
+           {
+     8         id = 'smelt_steel',
+     8         machine = CZCraft.MachineType.REFINERY,
+     8         duration = 60,
+     8         enabled = true,
+     8         access = CZCraft.AccessTag.CIVIL,
+     8         inputs = {
+     8             { item = 'iron', amount = 5 },
+     8             { item = 'metalscrap', amount = 2 },
+     8         },
+     8         outputs = {
+     8             { item = 'steel', amount = 2 },
+     8         },
+     8         primaryOutput = 'steel',
+     8     },
+           {
+     8         id = 'draw_copper_wire',
+     8         machine = CZCraft.MachineType.REFINERY,
+     8         duration = 45,
+     8         enabled = true,
+     8         access = CZCraft.AccessTag.CIVIL,
+     8         inputs = {
+     8             { item = 'copper', amount = 3 },
+     8         },
+     8         outputs = {
+     8             { item = 'cz_copper_wire', amount = 6 },
+     8         },
+     8         primaryOutput = 'cz_copper_wire',
+     8     },
+           {
+     8         id = 'roll_aluminum_sheet',
+     8         machine = CZCraft.MachineType.REFINERY,
+     8         duration = 50,
+     8         enabled = true,
+     8         access = CZCraft.AccessTag.CIVIL,
+     8         inputs = {
+     8             { item = 'aluminum', amount = 4 },
+     8         },
+     8         outputs = {
+     8             { item = 'cz_aluminum_sheet', amount = 2 },
+     8         },
+     8         primaryOutput = 'cz_aluminum_sheet',
+     8     },
+           -- Fabricator: processed -> intermediaries
+           {
+     8         id = 'make_metal_parts',
+     8         machine = CZCraft.MachineType.FABRICATOR,
+     8         duration = 60,
+     8         enabled = true,
+     8         access = CZCraft.AccessTag.CIVIL,
+     8         inputs = {
+     8             { item = 'steel', amount = 4 },
+     8         },
+     8         outputs = {
+     8             { item = 'cz_metal_parts', amount = 4 },
+     8         },
+     8         primaryOutput = 'cz_metal_parts',
+     8     },
+           {
+     8         id = 'make_casing',
+     8         machine = CZCraft.MachineType.FABRICATOR,
+     8         duration = 60,
+     8         enabled = true,
+     8         access = CZCraft.AccessTag.CIVIL,
+     8         inputs = {
+     8             { item = 'cz_aluminum_sheet', amount = 2 },
+     8             { item = 'plastic', amount = 4 },
+     8         },
+     8         outputs = {
+     8             { item = 'cz_casing', amount = 2 },
+     8         },
+     8         primaryOutput = 'cz_casing',
+     8     },
+           {
+     8         id = 'make_electronics',
+     8         machine = CZCraft.MachineType.FABRICATOR,
+     8         duration = 75,
+     8         enabled = true,
+     8         access = CZCraft.AccessTag.CIVIL,
+     8         inputs = {
+     8             { item = 'cz_copper_wire', amount = 4 },
+     8             { item = 'plastic', amount = 3 },
+     8         },
+     8         outputs = {
+     8             { item = 'cz_electronics', amount = 2 },
+     8         },
+     8         primaryOutput = 'cz_electronics',
+     8     },
+           {
+     8         id = 'make_mechanical_parts',
+     8         machine = CZCraft.MachineType.FABRICATOR,
+     8         duration = 75,
+     8         enabled = true,
+     8         access = CZCraft.AccessTag.CIVIL,
+     8         inputs = {
+     8             { item = 'cz_metal_parts', amount = 3 },
+     8             { item = 'rubber', amount = 2 },
+     8         },
+     8         outputs = {
+     8             { item = 'cz_mechanical_parts', amount = 2 },
+     8         },
+     8         primaryOutput = 'cz_mechanical_parts',
+     8     },
+           {
+     8         id = 'make_components',
+     8         machine = CZCraft.MachineType.FABRICATOR,
+     8         duration = 90,
+     8         enabled = true,
+     8         access = CZCraft.AccessTag.CIVIL,
+     8         inputs = {
+     8             { item = 'cz_metal_parts', amount = 2 },
+     8             { item = 'cz_electronics', amount = 1 },
+     8             { item = 'plastic', amount = 2 },
+     8         },
+     8         outputs = {
+     8             { item = 'cz_components', amount = 2 },
+     8         },
+     8         primaryOutput = 'cz_components',
+     8     },
+           -- Workbench: basic automatic operations
+           {
+     8         id = 'assemble_screwdriverset',
+     8         machine = CZCraft.MachineType.WORKBENCH,
+     8         duration = 120,
+     8         enabled = true,
+     8         access = CZCraft.AccessTag.CIVIL,
+     8         inputs = {
+     8             { item = 'cz_metal_parts', amount = 3 },
+     8             { item = 'plastic', amount = 2 },
+     8         },
+     8         outputs = {
+     8             { item = 'screwdriverset', amount = 1 },
+     8         },
+     8         primaryOutput = 'screwdriverset',
+     8     },
+           {
+     8         id = 'assemble_lockpick',
+     8         machine = CZCraft.MachineType.WORKBENCH,
+     8         duration = 75,
+     8         enabled = true,
+     8         access = CZCraft.AccessTag.CIVIL,
+     8         inputs = {
+     8             { item = 'cz_metal_parts', amount = 2 },
+     8         },
+     8         outputs = {
+     8             { item = 'lockpick', amount = 2 },
+     8         },
+     8         primaryOutput = 'lockpick',
+     8     },
+           -- Assembly: intermediaries -> finals / ORG weapons
+           {
+     8         id = 'assemble_repairkit',
+     8         machine = CZCraft.MachineType.ASSEMBLY,
+     8         duration = 180,
+     8         enabled = true,
+     8         access = CZCraft.AccessTag.CIVIL,
+     8         inputs = {
+     8             { item = 'cz_components', amount = 3 },
+     8             { item = 'cz_mechanical_parts', amount = 2 },
+     8             { item = 'cz_casing', amount = 1 },
+     8         },
+     8         outputs = {
+     8             { item = 'repairkit', amount = 1 },
+     8         },
+     8         primaryOutput = 'repairkit',
+     8     },
+           {
+     8         id = 'assemble_pistol_ammo',
+     8         machine = CZCraft.MachineType.ASSEMBLY,
+     8         duration = 150,
+     8         enabled = true,
+     8         access = CZCraft.AccessTag.ORG_WEAPONS,
+     8         inputs = {
+     8             { item = 'cz_copper_wire', amount = 3 },
+     8             { item = 'cz_metal_parts', amount = 2 },
+     8         },
+     8         outputs = {
+     8             { item = 'pistol_ammo', amount = 1 },
+     8         },
+     8         primaryOutput = 'pistol_ammo',
+     8     },
+           {
+     8         id = 'assemble_receiver',
+     8         machine = CZCraft.MachineType.ASSEMBLY,
+     8         duration = 240,
+     8         enabled = true,
+     8         access = CZCraft.AccessTag.ORG_WEAPONS,
+     8         inputs = {
+     8             { item = 'steel', amount = 5 },
+     8             { item = 'cz_metal_parts', amount = 4 },
+     8             { item = 'cz_casing', amount = 1 },
+     8         },
+     8         outputs = {
+     8             { item = 'cz_receiver', amount = 1 },
+     8         },
+     8         primaryOutput = 'cz_receiver',
+     8     },
+           {
+     8         id = 'assemble_pistol',
+     8         machine = CZCraft.MachineType.ASSEMBLY,
+     8         duration = 600,
+     8         enabled = true,
+     8         access = CZCraft.AccessTag.ORG_WEAPONS,
+     8         inputs = {
+     8             { item = 'cz_receiver', amount = 1 },
+     8             { item = 'cz_components', amount = 3 },
+     8             { item = 'cz_mechanical_parts', amount = 1 },
+     8         },
+     8         outputs = {
+     8             { item = 'weapon_pistol', amount = 1 },
+     8         },
+     8         primaryOutput = 'weapon_pistol',
+           },
+     8 }
+
+==============================================================================
+resources\[meus-scripts]\qb-czcraft\server\domain\bills.lua
+==============================================================================
+       -- qb-czcraft bills domain (pure)
+       -- Bill creation, pause/remove semantics, and stable selection logic for
+       -- PRODUCE_X and MAINTAIN_X modes. Pure so it runs under stock Lua 5.4 in tests.
+       --
+       -- Bill semantics (from decisions.md):
+       --   PRODUCE_X: target in primary-output units, must be a multiple of the batch
+       --     size; counts COMPLETED primary-output units, not current stock.
+       --     Withdrawing stock never reopens a finished bill.
+       --   MAINTAIN_X: compares stock + reserved output; may exceed target by at
+       --     most one batch.
+       --   Pause: current cycle finishes; no new cycle starts.
+       --   Remove: pause + mark removed (stock/reservations unaffected).
+       --   Selection: stable order by (enabled, priority, created_sequence).
+
+     4 CZCraft = CZCraft or {}
+
+     4 local BillMode = {
+     4     PRODUCE_X = 'PRODUCE_X',
+     4     MAINTAIN_X = 'MAINTAIN_X',
+       }
+
+     4 local BillStatus = {
+     4     PENDING = 'PENDING',
+     4     ACTIVE = 'ACTIVE',
+     4     PAUSED = 'PAUSED',
+     4     COMPLETED = 'COMPLETED',
+     4     REMOVED = 'REMOVED',
+       }
+
+     4 local BillPriority = {
+     4     NORMAL = 'NORMAL',
+       }
+
+       -- Validates a bill creation request.
+       -- @param params table {
+       --   mode, recipeId, primaryOutput, targetQuantity, batchOutputAmount,
+       --   createdBy = { type, id },
+       -- }
+       -- @return boolean ok
+       -- @return string|nil reason
+       local function validateBillCreation(params)
+    12     if type(params) ~= 'table' then
+*****0         return false, 'params must be a table'
+           end
+    12     if params.mode ~= BillMode.PRODUCE_X and params.mode ~= BillMode.MAINTAIN_X then
+     2         return false, 'mode must be PRODUCE_X or MAINTAIN_X'
+           end
+    10     if type(params.recipeId) ~= 'string' or params.recipeId == '' then
+*****0         return false, 'recipeId must be a nonempty string'
+           end
+    10     if type(params.primaryOutput) ~= 'string' or params.primaryOutput == '' then
+*****0         return false, 'primaryOutput must be a nonempty string'
+           end
+    10     if type(params.targetQuantity) ~= 'number'
+    10         or params.targetQuantity ~= math.floor(params.targetQuantity)
+     8         or params.targetQuantity <= 0 then
+     4         return false, 'targetQuantity must be a positive integer'
+           end
+     6     if type(params.batchOutputAmount) ~= 'number'
+     6         or params.batchOutputAmount ~= math.floor(params.batchOutputAmount)
+     6         or params.batchOutputAmount <= 0 then
+*****0         return false, 'batchOutputAmount must be a positive integer'
+           end
+           -- PRODUCE_X: target must be a multiple of the batch output amount.
+     6     if params.mode == BillMode.PRODUCE_X then
+     4         if params.targetQuantity % params.batchOutputAmount ~= 0 then
+     4             return false, ('PRODUCE_X target (%d) must be a multiple of batch output (%d)'):format(
+     4                 params.targetQuantity, params.batchOutputAmount)
+               end
+           end
+     4     return true
+       end
+
+       -- Checks whether a PRODUCE_X bill is complete (produced >= target).
+       -- @param bill table { mode, target_quantity, produced_quantity }
+       -- @return boolean complete
+       local function isProduceXComplete(bill)
+    18     return (bill.produced_quantity or 0) >= bill.target_quantity
+       end
+
+       -- Checks whether a MAINTAIN_X bill is satisfied.
+       -- MAINTAIN_X compares stock + reserved output against the target. It may
+       -- exceed the target by at most one batch.
+       -- @param bill table { mode, target_quantity }
+       -- @param stockPlusReserved number current stock of primaryOutput + reserved output
+       -- @param batchOutputAmount number output per batch
+       -- @return boolean satisfied
+       local function isMaintainXSatisfied(bill, stockPlusReserved, batchOutputAmount)
+    10     local available = stockPlusReserved or 0
+    10     local target = bill.target_quantity
+           -- Satisfied when available >= target. Overshoot by at most one batch is
+           -- allowed: the cycle engine must not start a new cycle if
+           -- available >= target (even if available < target + batchOutputAmount).
+    10     return available >= target
+       end
+
+       -- Determines whether a new cycle should start for a bill.
+       -- PRODUCE_X: start if not complete (produced < target).
+       -- MAINTAIN_X: start if stock + reserved < target (may overshoot by one batch).
+       -- @param bill table
+       -- @param stockPlusReserved number (for MAINTAIN_X)
+       -- @param batchOutputAmount number
+       -- @return boolean shouldStart
+       local function shouldStartCycle(bill, stockPlusReserved, batchOutputAmount)
+    22     if not bill.enabled then
+     2         return false
+           end
+    20     if bill.status == BillStatus.PAUSED or bill.status == BillStatus.REMOVED then
+     2         return false
+           end
+    18     if bill.mode == BillMode.PRODUCE_X then
+    14         return not isProduceXComplete(bill)
+           end
+     4     if bill.mode == BillMode.MAINTAIN_X then
+     4         return not isMaintainXSatisfied(bill, stockPlusReserved, batchOutputAmount)
+           end
+*****0     return false
+       end
+
+       -- Computes how many cycles of a recipe can run in a catch-up chunk given the
+       -- elapsed time, input availability, output capacity, and bill target.
+       -- This is the analytic multi-cycle computation: no per-cycle loops.
+       -- @param params table {
+       --   recipeDurationSeconds, elapsedSeconds, maxCyclesPerChunk,
+       --   inputAvailability = { [item_name] = available_count },
+       --   recipeInputs = { { item, amount } },
+       --   outputCapacityRemaining = number (grams or units),
+       --   outputWeightPerCycle = number,
+       --   bill = { mode, target_quantity, produced_quantity } | nil,
+       --   batchOutputAmount = number,
+       --   stockPlusReserved = number (for MAINTAIN_X),
+       -- }
+       -- @return number cyclesToRun (0 if blocked)
+       -- @return string|nil blockReason
+       local function computeCyclesForChunk(params)
+    80     if type(params) ~= 'table' then
+*****0         return 0, 'params must be a table'
+           end
+
+    80     local duration = params.recipeDurationSeconds
+    80     local elapsed = params.elapsedSeconds or 0
+    80     if type(duration) ~= 'number' or duration <= 0 then
+*****0         return 0, 'invalid recipe duration'
+           end
+    80     if elapsed <= 0 then
+     4         return 0, nil  -- zero/negative elapsed: no cycles to run
+           end
+
+           -- Time-bound: how many full cycles fit in the elapsed time.
+    76     local timeBoundedCycles = math.floor(elapsed / duration)
+    76     if timeBoundedCycles <= 0 then
+*****0         return 0, nil
+           end
+
+           -- Cap by max cycles per chunk.
+    76     local maxCycles = params.maxCyclesPerChunk or timeBoundedCycles
+    76     if maxCycles < timeBoundedCycles then
+    40         timeBoundedCycles = maxCycles
+           end
+
+           -- Input-bound: how many cycles can the available inputs support.
+    76     local inputBoundedCycles = timeBoundedCycles
+    76     if type(params.recipeInputs) == 'table' and type(params.inputAvailability) == 'table' then
+   152         for _, line in ipairs(params.recipeInputs) do
+    76             local available = params.inputAvailability[line.item] or 0
+    76             local cyclesFromThisInput = math.floor(available / line.amount)
+    76             if cyclesFromThisInput < inputBoundedCycles then
+    10                 inputBoundedCycles = cyclesFromThisInput
+                   end
+               end
+           end
+    76     if inputBoundedCycles <= 0 then
+     6         return 0, 'insufficient inputs'
+           end
+
+           -- Output-capacity-bound: how many cycles fit in the remaining output capacity.
+    70     local cycles = inputBoundedCycles
+    70     if params.outputWeightPerCycle and params.outputCapacityRemaining then
+    70         local outputBoundedCycles = math.floor(params.outputCapacityRemaining / params.outputWeightPerCycle)
+    70         if outputBoundedCycles < cycles then
+     4             cycles = outputBoundedCycles
+               end
+           end
+    70     if cycles <= 0 then
+     4         return 0, 'output cap reached'
+           end
+
+           -- Bill-target-bound: don't overshoot the bill target.
+    66     local bill = params.bill
+    66     if bill then
+    18         if bill.mode == BillMode.PRODUCE_X then
+     6             local remaining = bill.target_quantity - (bill.produced_quantity or 0)
+     6             local batchOutput = params.batchOutputAmount or 1
+     6             local billBoundedCycles = math.floor(remaining / batchOutput)
+     6             if billBoundedCycles < cycles then
+     6                 cycles = billBoundedCycles
+                   end
+    12         elseif bill.mode == BillMode.MAINTAIN_X then
+                   -- MAINTAIN_X: may exceed target by at most one batch.
+    12             local target = bill.target_quantity
+    12             local stockPlusReserved = params.stockPlusReserved or 0
+    12             local batchOutput = params.batchOutputAmount or 1
+    12             local remainingToTarget = target - stockPlusReserved
+    12             if remainingToTarget <= 0 then
+     6                 return 0, 'maintain target already met'
+                   end
+                   -- Allow up to ceil(remainingToTarget / batchOutput) cycles, which
+                   -- permits overshoot by at most one batch.
+     6             local billBoundedCycles = math.ceil(remainingToTarget / batchOutput)
+     6             if billBoundedCycles < cycles then
+     6                 cycles = billBoundedCycles
+                   end
+               end
+           end
+
+    60     if cycles <= 0 then
+     2         return 0, 'bill target reached'
+           end
+
+    58     return cycles, nil
+       end
+
+       -- Selects the next bill to run for a machine from a list of candidate bills.
+       -- Stable order: enabled first, then by priority (NORMAL only at v0.1), then
+       -- by created_sequence (ascending).
+       -- @param bills table list of bill rows
+       -- @param stockPlusReservedByItem table { [primary_output] = number } (for MAINTAIN_X)
+       -- @param batchOutputByBill table { [bill_id] = number }
+       -- @return table|nil selectedBill
+       local function selectNextBill(bills, stockPlusReservedByItem, batchOutputByBill)
+     6     if type(bills) ~= 'table' then return nil end
+
+     6     local candidates = {}
+    20     for _, bill in ipairs(bills) do
+    14         if bill.enabled and bill.status ~= BillStatus.PAUSED and bill.status ~= BillStatus.REMOVED then
+    10             local batchOutput = batchOutputByBill and batchOutputByBill[bill.bill_id] or 1
+    10             local stockPlusReserved = stockPlusReservedByItem and stockPlusReservedByItem[bill.primary_output] or 0
+    10             if shouldStartCycle(bill, stockPlusReserved, batchOutput) then
+     8                 candidates[#candidates + 1] = bill
+                   end
+               end
+           end
+
+     6     if #candidates == 0 then
+     2         return nil
+           end
+
+           -- Sort by priority (NORMAL only at v0.1, so this is stable), then by
+           -- created_sequence ascending.
+     8     table.sort(candidates, function(a, b)
+     4         if a.priority ~= b.priority then
+*****0             return a.priority < b.priority
+               end
+     4         return (a.created_sequence or 0) < (b.created_sequence or 0)
+           end)
+
+     4     return candidates[1]
+       end
+
+       -- Computes the new produced_quantity after completing a cycle for a bill.
+       -- @param bill table { mode, produced_quantity }
+       -- @param batchOutputAmount number
+       -- @return number newProducedQuantity
+       local function applyCycleCompletion(bill, batchOutputAmount)
+     4     return (bill.produced_quantity or 0) + batchOutputAmount
+       end
+
+     4 CZCraft.Bills = {
+     4     Mode = BillMode,
+     4     Status = BillStatus,
+     4     Priority = BillPriority,
+     4     validateBillCreation = validateBillCreation,
+     4     isProduceXComplete = isProduceXComplete,
+     4     isMaintainXSatisfied = isMaintainXSatisfied,
+     4     shouldStartCycle = shouldStartCycle,
+     4     computeCyclesForChunk = computeCyclesForChunk,
+     4     selectNextBill = selectNextBill,
+     4     applyCycleCompletion = applyCycleCompletion,
+     4 }
+
+     4 return CZCraft.Bills
+
+==============================================================================
+resources\[meus-scripts]\qb-czcraft\server\domain\catchup.lua
+==============================================================================
+       -- qb-czcraft catch-up domain (pure)
+       -- Analytic multi-cycle catch-up computation for offline/downtime recovery.
+       -- No time limit; chunked to bound lock duration; continues until now or a
+       -- genuine block (missing input, disabled recipe, output cap).
+       --
+       -- The catch-up uses the SAME formula as real-time production — no separate
+       -- offline-only formula that could drift from the live one.
+
+     2 CZCraft = CZCraft or {}
+
+       -- Computes the catch-up plan for a single machine: how many cycles to run
+       -- in the current chunk, and whether to continue or stop.
+       -- @param params table {
+       --   lastCompletedAt number, now number,
+       --   recipe = { id, duration, inputs, outputs, enabled },
+       --   bill = { mode, target_quantity, produced_quantity } | nil,
+       --   stockRows = { { item_name, quantity, reserved_quantity } },
+       --   machineUsedWeight, machineReservedWeight, machineCapacity,
+       --   itemWeights = { [item_name] = weight },
+       --   batchOutputAmount number,
+       --   maxCyclesPerChunk number,
+       --   stockPlusReservedByItem = { [item_name] = number } (for MAINTAIN_X bill selection),
+       -- }
+       -- @return table {
+       --   cyclesToRun number,
+       --   blockReason string|nil,
+       --   shouldContinue boolean,
+       --   nextChunkElapsed number (elapsed time consumed by this chunk),
+       -- }
+       local function computeCatchUpChunk(params)
+    66     if type(params) ~= 'table' then
+*****0         return { cyclesToRun = 0, blockReason = 'params must be a table', shouldContinue = false, nextChunkElapsed = 0 }
+           end
+
+    66     local recipe = params.recipe
+    66     if type(recipe) ~= 'table' then
+*****0         return { cyclesToRun = 0, blockReason = 'no recipe', shouldContinue = false, nextChunkElapsed = 0 }
+           end
+
+           -- A disabled recipe blocks catch-up: the current in-flight cycle (if any)
+           -- completes, but no new cycles start.
+    66     if recipe.enabled == false then
+     2         return { cyclesToRun = 0, blockReason = 'recipe disabled', shouldContinue = false, nextChunkElapsed = 0 }
+           end
+
+    64     local lastCompletedAt = params.lastCompletedAt or 0
+    64     local now = params.now or 0
+    64     local elapsed = now - lastCompletedAt
+
+           -- Zero or negative elapsed: no catch-up needed.
+    64     if elapsed <= 0 then
+     4         return { cyclesToRun = 0, blockReason = nil, shouldContinue = false, nextChunkElapsed = 0 }
+           end
+
+           -- Build input availability from stock rows.
+    60     local inputAvailability = {}
+    60     if type(params.stockRows) == 'table' then
+   180         for _, row in ipairs(params.stockRows) do
+   120             if row and row.item_name then
+   120                 inputAvailability[row.item_name] = (row.quantity or 0) - (row.reserved_quantity or 0)
+                   end
+               end
+           end
+
+           -- Compute output capacity remaining.
+    60     local usedWeight = params.machineUsedWeight or 0
+    60     local currentReserved = params.machineReservedWeight or 0
+    60     local capacity = params.machineCapacity or 0
+    60     local outputCapacityRemaining = capacity - usedWeight - currentReserved
+
+           -- Compute output weight per cycle.
+    60     local outputWeightPerCycle = 0
+    60     if type(recipe.outputs) == 'table' and type(params.itemWeights) == 'table' then
+   120         for _, line in ipairs(recipe.outputs) do
+    60             local weight = params.itemWeights[line.item] or 0
+    60             outputWeightPerCycle = outputWeightPerCycle + (weight * line.amount)
+               end
+           end
+
+           -- Use the bills domain to compute cycles for this chunk.
+   120     local cycles, blockReason = CZCraft.Bills.computeCyclesForChunk({
+    60         recipeDurationSeconds = recipe.duration,
+    60         elapsedSeconds = elapsed,
+    60         maxCyclesPerChunk = params.maxCyclesPerChunk,
+    60         inputAvailability = inputAvailability,
+    60         recipeInputs = recipe.inputs,
+    60         outputCapacityRemaining = outputCapacityRemaining,
+    60         outputWeightPerCycle = outputWeightPerCycle,
+    60         bill = params.bill,
+    60         batchOutputAmount = params.batchOutputAmount,
+    60         stockPlusReserved = params.stockPlusReservedByItem and params.stockPlusReservedByItem[recipe.primaryOutput] or 0,
+           })
+
+    60     if cycles <= 0 then
+               -- If there's a block reason, stop. If cycles is 0 with no reason
+               -- (e.g. zero elapsed after rounding), we may still need to continue
+               -- if elapsed was positive but less than one duration.
+    12         if blockReason then
+    12             return { cyclesToRun = 0, blockReason = blockReason, shouldContinue = false, nextChunkElapsed = 0 }
+               end
+               -- Elapsed was positive but less than one cycle duration: no cycles
+               -- this chunk, but there's still time remaining — stop (the next
+               -- scheduler tick will handle it).
+*****0         return { cyclesToRun = 0, blockReason = nil, shouldContinue = false, nextChunkElapsed = elapsed }
+           end
+
+           -- Time consumed by this chunk.
+    48     local chunkElapsed = cycles * recipe.duration
+    48     local remainingElapsed = elapsed - chunkElapsed
+
+           -- Should continue if there's still time remaining and no block.
+    48     local shouldContinue = remainingElapsed >= recipe.duration
+
+    48     return {
+    48         cyclesToRun = cycles,
+    48         blockReason = nil,
+    48         shouldContinue = shouldContinue,
+    48         nextChunkElapsed = chunkElapsed,
+    48     }
+       end
+
+       -- Computes the total catch-up plan across multiple chunks for a machine.
+       -- This is a pure simulation used by tests; the real catch-up runs one chunk
+       -- per transaction and yields between chunks.
+       -- @param params table (same as computeCatchUpChunk, plus maxChunks)
+       -- @return table { totalCycles, chunks = { { cycles, elapsed } }, finalBlockReason }
+       local function simulateFullCatchUp(params)
+    12     local totalCycles = 0
+    12     local chunks = {}
+           local finalBlockReason
+    12     local maxChunks = params.maxChunks or 1000
+
+           -- Mutable state for the simulation.
+    12     local state = {
+    12         lastCompletedAt = params.lastCompletedAt or 0,
+    12         stockRows = params.stockRows and {} or nil,
+    12         machineUsedWeight = params.machineUsedWeight,
+    12         machineReservedWeight = params.machineReservedWeight,
+    12         bill = params.bill and {} or nil,
+           }
+
+           -- Deep copy mutable state.
+    12     if params.stockRows then
+    36         for _, row in ipairs(params.stockRows) do
+    24             state.stockRows[#state.stockRows + 1] = {
+    24                 item_name = row.item_name,
+    24                 quantity = row.quantity,
+    24                 reserved_quantity = row.reserved_quantity,
+    24             }
+               end
+           end
+    12     if params.bill then
+    20         for k, v in pairs(params.bill) do
+    14             state.bill[k] = v
+               end
+           end
+
+    54     for _ = 1, maxChunks do
+               -- Build params for this chunk.
+    54         local chunkParams = {}
+   714         for k, v in pairs(params) do
+   660             chunkParams[k] = v
+               end
+    54         chunkParams.lastCompletedAt = state.lastCompletedAt
+    54         chunkParams.stockRows = state.stockRows
+    54         chunkParams.machineUsedWeight = state.machineUsedWeight
+    54         chunkParams.machineReservedWeight = state.machineReservedWeight
+    54         chunkParams.bill = state.bill
+    54         chunkParams.now = params.now
+
+    54         local result = computeCatchUpChunk(chunkParams)
+
+    54         if result.cyclesToRun <= 0 then
+     8             finalBlockReason = result.blockReason
+     8             break
+               end
+
+    46         chunks[#chunks + 1] = { cycles = result.cyclesToRun, elapsed = result.nextChunkElapsed }
+    46         totalCycles = totalCycles + result.cyclesToRun
+
+               -- Update state: advance time, consume inputs, add outputs.
+    46         state.lastCompletedAt = state.lastCompletedAt + result.nextChunkElapsed
+
+               -- Consume inputs and add outputs in the stock simulation.
+    46         local recipe = params.recipe
+    46         if state.stockRows and type(recipe.inputs) == 'table' then
+    92             for _, line in ipairs(recipe.inputs) do
+    46                 for _, row in ipairs(state.stockRows) do
+    46                     if row.item_name == line.item then
+    46                         row.quantity = row.quantity - (line.amount * result.cyclesToRun)
+    46                         break
+                           end
+                       end
+                   end
+               end
+    46         if state.stockRows and type(recipe.outputs) == 'table' then
+    92             for _, line in ipairs(recipe.outputs) do
+    46                 local found = false
+    92                 for _, row in ipairs(state.stockRows) do
+    92                     if row.item_name == line.item then
+    46                         row.quantity = row.quantity + (line.amount * result.cyclesToRun)
+    46                         found = true
+    46                         break
+                           end
+                       end
+    46                 if not found then
+*****0                     state.stockRows[#state.stockRows + 1] = {
+                               item_name = line.item,
+                               quantity = line.amount * result.cyclesToRun,
+                               reserved_quantity = 0,
+                           }
+                       end
+                   end
+               end
+
+               -- Update bill produced_quantity for PRODUCE_X.
+    46         if state.bill and state.bill.mode == CZCraft.Bills.Mode.PRODUCE_X then
+     2             state.bill.produced_quantity = (state.bill.produced_quantity or 0)
+     2                 + (params.batchOutputAmount * result.cyclesToRun)
+               end
+
+               -- Update MAINTAIN_X stockPlusReserved.
+    46         if state.bill and state.bill.mode == CZCraft.Bills.Mode.MAINTAIN_X then
+                   -- Recompute stockPlusReserved for the primary output.
+     4             if not params.stockPlusReservedByItem then
+*****0                 params.stockPlusReservedByItem = {}
+                   end
+     4             local total = 0
+    12             for _, row in ipairs(state.stockRows) do
+     8                 if row.item_name == recipe.primaryOutput then
+     4                     total = total + row.quantity
+                       end
+                   end
+     4             params.stockPlusReservedByItem[recipe.primaryOutput] = total
+               end
+
+    46         if not result.shouldContinue then
+                   break
+               end
+           end
+
+    12     return {
+    12         totalCycles = totalCycles,
+    12         chunks = chunks,
+    12         finalBlockReason = finalBlockReason,
+    12     }
+       end
+
+     2 CZCraft.CatchUp = {
+     2     computeCatchUpChunk = computeCatchUpChunk,
+     2     simulateFullCatchUp = simulateFullCatchUp,
+     2 }
+
+     2 return CZCraft.CatchUp
+
+==============================================================================
+resources\[meus-scripts]\qb-czcraft\server\domain\machines.lua
+==============================================================================
+       -- qb-czcraft machine domain (pure)
+       -- Lifecycle state machine (PACKED|INSTALLED) and placement validation for
+       -- HOUSE and ORG locations. Side-effect-free: placement validation accepts the
+       -- machine config, plots config, house access result, and a bounds/injection
+       -- fixture so it runs under stock Lua 5.4 in tests.
+
+     4 CZCraft = CZCraft or {}
+
+     4 local Lifecycle = {
+     4     PACKED = 'PACKED',
+     4     INSTALLED = 'INSTALLED',
+       }
+
+     4 local OperationalStatus = {
+     4     STOPPED = 'STOPPED',
+     4     RUNNING = 'RUNNING',
+       }
+
+       -- Distance helpers (pure math; the api layer passes real ped/transform coords).
+       local function isFiniteNumber(value)
+   216     return type(value) == 'number' and value == value and math.abs(value) ~= math.huge
+       end
+
+       local function distance2D(ax, ay, bx, by)
+     2     local dx = ax - bx
+     2     local dy = ay - by
+     2     return math.sqrt(dx * dx + dy * dy)
+       end
+
+       local function distance3D(ax, ay, az, bx, by, bz)
+    26     local dx = ax - bx
+    26     local dy = ay - by
+    26     local dz = az - bz
+    26     return math.sqrt(dx * dx + dy * dy + dz * dz)
+       end
+
+       -- Validates a transform is finite and within an optional ped-proximity limit.
+       -- @param transform table { pos_x, pos_y, pos_z, heading }
+       -- @param pedCoords table|nil { x, y, z } when proximity must be re-checked
+       -- @param maxProximity number|nil meters the machine may be from the ped
+       -- @return boolean ok
+       -- @return string|nil reason
+       local function validateTransform(transform, pedCoords, maxProximity)
+    28     if type(transform) ~= 'table' then
+*****0         return false, 'transform must be a table'
+           end
+    28     if not isFiniteNumber(transform.pos_x)
+    28         or not isFiniteNumber(transform.pos_y)
+    26         or not isFiniteNumber(transform.pos_z) then
+     2         return false, 'transform position must be finite numbers'
+           end
+    26     if not isFiniteNumber(transform.heading) then
+*****0         return false, 'transform heading must be a finite number'
+           end
+    26     if pedCoords and maxProximity then
+    26         if not isFiniteNumber(pedCoords.x) or not isFiniteNumber(pedCoords.y) or not isFiniteNumber(pedCoords.z) then
+*****0             return false, 'ped coords must be finite numbers'
+               end
+    26         local dist = distance3D(transform.pos_x, transform.pos_y, transform.pos_z, pedCoords.x, pedCoords.y, pedCoords.z)
+    26         if dist > maxProximity then
+     2             return false, ('machine must be within %.2fm of the player ped (was %.2fm)'):format(maxProximity, dist)
+               end
+           end
+    24     return true
+       end
+
+       -- Finds the machine config entry for a machine type.
+       -- @param machinesConfig table ordered list from Config.Machines
+       -- @param machineType string
+       -- @return table|nil machineConfig
+       local function findMachineConfig(machinesConfig, machineType)
+    30     if type(machinesConfig) ~= 'table' then return nil end
+    74     for _, machine in ipairs(machinesConfig) do
+    72         if machine and machine.type == machineType then
+    28             return machine
+               end
+           end
+     2     return nil
+       end
+
+       -- Point-in-polygon (ray casting). Pure, no natives.
+       -- @param polygon table ordered list of { x, y }
+       -- @param px, py number point to test
+       -- @return boolean inside
+       local function pointInPolygon(polygon, px, py)
+    16     if type(polygon) ~= 'table' or #polygon < 3 then
+*****0         return false
+           end
+    16     local inside = false
+    16     local j = #polygon
+    80     for i = 1, #polygon do
+    64         local pi = polygon[i]
+    64         local pj = polygon[j]
+    64         if (pi.y > py) ~= (pj.y > py) then
+    24             local xIntersect = (pj.x - pi.x) * (py - pi.y) / (pj.y - pi.y) + pi.x
+    24             if px < xIntersect then
+    12                 inside = not inside
+                   end
+               end
+    64         j = i
+           end
+    16     return inside
+       end
+
+       -- Finds the ORG plot containing a position, respecting polygon + z-range.
+       -- @param plotsConfig table Config.Plots
+       -- @param pos table { x, y, z }
+       -- @return table|nil plot
+       local function findPlotAt(plotsConfig, pos)
+    12     if type(plotsConfig) ~= 'table' then return nil end
+    16     for _, plot in ipairs(plotsConfig) do
+    12         if type(plot) == 'table' and type(plot.polygon) == 'table' then
+    12             if pointInPolygon(plot.polygon, pos.x, pos.y) then
+    10                 local zBounds = plot.zBounds
+    10                 if type(zBounds) == 'table'
+    10                     and isFiniteNumber(zBounds.min) and isFiniteNumber(zBounds.max) then
+    10                     if pos.z < zBounds.min or pos.z > zBounds.max then
+     2                         goto continue
+                           end
+                       end
+     8                 return plot
+                   end
+               end
+               ::continue::
+           end
+     4     return nil
+       end
+
+       -- Counts existing machines at a location (for cap enforcement).
+       -- @param existingMachines table list of { location_type, location_id }
+       -- @param locationType string
+       -- @param locationId string
+       -- @return number count
+       local function countMachinesAtLocation(existingMachines, locationType, locationId)
+    14     if type(existingMachines) ~= 'table' then return 0 end
+    14     local count = 0
+    28     for _, machine in ipairs(existingMachines) do
+    14         if machine and machine.location_type == locationType and machine.location_id == locationId then
+    14             count = count + 1
+               end
+           end
+    14     return count
+       end
+
+       -- Checks clearance: the proposed transform must be at least `clearance` meters
+       -- from every other installed machine at the same location.
+       -- @param existingMachines table list of { pos_x, pos_y, pos_z, location_type, location_id }
+       -- @param locationType string
+       -- @param locationId string
+       -- @param transform table { pos_x, pos_y, pos_z }
+       -- @param clearance number meters
+       -- @return boolean ok
+       -- @return string|nil reason
+       local function checkClearance(existingMachines, locationType, locationId, transform, clearance)
+    10     if type(existingMachines) ~= 'table' then return true end
+    10     for _, machine in ipairs(existingMachines) do
+     2         if machine and machine.location_type == locationType and machine.location_id == locationId then
+     2             if isFiniteNumber(machine.pos_x) and isFiniteNumber(machine.pos_y) then
+     2                 local dist = distance2D(transform.pos_x, transform.pos_y, machine.pos_x, machine.pos_y)
+     2                 if dist < clearance then
+     2                     return false, ('machine too close to an existing machine (%.2fm < %.2fm clearance)'):format(dist, clearance)
+                       end
+                   end
+               end
+           end
+     8     return true
+       end
+
+       -- Result builder for placement validation.
+       local function okResult(machineConfig, ownerRef, location)
+     6     return {
+     6         ok = true,
+     6         machineConfig = machineConfig,
+     6         ownerRef = ownerRef,
+     6         location = location,
+     6     }
+       end
+
+       local function failResult(reason)
+    28     return { ok = false, reason = reason }
+       end
+
+       -- Validates a HOUSE placement request.
+       -- @param params table {
+       --   transform, machineType, machinesConfig, fixtureCaps,
+       --   houseAccess = { isOwner, isKeyholder, insideHouseId, shellBounds? },
+       --   existingMachines, pedCoords, maxProximity,
+       -- }
+       -- @return table { ok, reason?, machineConfig?, ownerRef?, location? }
+       local function validateHousePlacement(params)
+    22     if type(params) ~= 'table' then return failResult('params must be a table') end
+    22     local houseAccess = params.houseAccess
+    22     if type(houseAccess) ~= 'table' then
+*****0         return failResult('houseAccess is required for HOUSE placement')
+           end
+
+           -- Must be inside the house.
+    22     local insideHouseId = houseAccess.insideHouseId
+    22     if type(insideHouseId) ~= 'string' or insideHouseId == '' then
+     2         return failResult('player must be inside a house to place a HOUSE machine')
+           end
+
+           -- Owner or keyholder.
+    20     if not houseAccess.isOwner and not houseAccess.isKeyholder then
+     2         return failResult('only the house owner or a keyholder may place a machine')
+           end
+
+           -- Machine type allow-list.
+    18     local machineConfig = findMachineConfig(params.machinesConfig, params.machineType)
+    18     if not machineConfig then
+     2         return failResult('machine type not in allow-list: ' .. tostring(params.machineType))
+           end
+
+           -- Transform + proximity.
+    16     local transformOk, transformReason = validateTransform(params.transform, params.pedCoords, params.maxProximity)
+    16     if not transformOk then
+     4         return failResult(transformReason)
+           end
+
+           -- Shell bounds: if provided, the machine must lie within them. qb-houses
+           -- does not expose exact shell bounds at v0.1; the api layer may pass a
+           -- bounding box derived from the shell origin. When absent, the proximity
+           -- check is the only spatial guard.
+    12     local shellBounds = houseAccess.shellBounds
+    12     if type(shellBounds) == 'table'
+     2         and isFiniteNumber(shellBounds.minX) and isFiniteNumber(shellBounds.maxX)
+     2         and isFiniteNumber(shellBounds.minY) and isFiniteNumber(shellBounds.maxY) then
+     2         local t = params.transform
+     2         if t.pos_x < shellBounds.minX or t.pos_x > shellBounds.maxX
+*****0             or t.pos_y < shellBounds.minY or t.pos_y > shellBounds.maxY then
+     2             return failResult('machine transform is outside the house shell bounds')
+               end
+           end
+
+           -- Cap.
+    10     local cap = params.fixtureCaps and params.fixtureCaps[CZCraft.LocationType.HOUSE]
+    10     if type(cap) ~= 'number' or cap < 1 then
+*****0         return failResult('HOUSE fixture cap is not configured')
+           end
+    10     local existing = countMachinesAtLocation(params.existingMachines, CZCraft.LocationType.HOUSE, insideHouseId)
+    10     if existing >= cap then
+     2         return failResult(('HOUSE machine cap reached (%d/%d)'):format(existing, cap))
+           end
+
+           -- Clearance.
+    16     local clearanceOk, clearanceReason = checkClearance(
+     8         params.existingMachines, CZCraft.LocationType.HOUSE, insideHouseId,
+     8         params.transform, machineConfig.placementClearance
+     8     )
+     8     if not clearanceOk then
+     2         return failResult(clearanceReason)
+           end
+
+           -- HOUSE owner is always the house owner (even when a keyholder places).
+           -- The ownerRef is supplied by the caller; the api layer resolves it from
+           -- the house owner's citizenid.
+     6     local ownerRef = params.ownerRef
+     6     local ownerValid, ownerReason = CZCraft.Owners.isValidOwnerRef(ownerRef)
+     6     if not ownerValid then
+     2         return failResult('invalid ownerRef: ' .. tostring(ownerReason))
+           end
+
+     8     return okResult(machineConfig, ownerRef, {
+     4         type = CZCraft.LocationType.HOUSE,
+     4         id = insideHouseId,
+           })
+       end
+
+       -- Validates an ORG placement request.
+       -- @param params table {
+       --   transform, machineType, machinesConfig, plotsConfig, fixtureCaps,
+       --   ownerRef, orgAccess = { gradeKey, isStillMember }, existingMachines,
+       --   pedCoords, maxProximity,
+       -- }
+       -- @return table { ok, reason?, machineConfig?, ownerRef?, location? }
+       local function validateOrgPlacement(params)
+    12     if type(params) ~= 'table' then return failResult('params must be a table') end
+
+           -- Machine type allow-list.
+    12     local machineConfig = findMachineConfig(params.machinesConfig, params.machineType)
+    12     if not machineConfig then
+*****0         return failResult('machine type not in allow-list: ' .. tostring(params.machineType))
+           end
+
+           -- Transform + proximity.
+    12     local transformOk, transformReason = validateTransform(params.transform, params.pedCoords, params.maxProximity)
+    12     if not transformOk then
+*****0         return failResult(transformReason)
+           end
+
+           -- Plot must contain the transform.
+    12     local t = params.transform
+    12     local plot = findPlotAt(params.plotsConfig, { x = t.pos_x, y = t.pos_y, z = t.pos_z })
+    12     if not plot then
+     4         return failResult('transform is not inside any configured ORG plot')
+           end
+
+           -- Plot owner context must match the chosen ownerRef.
+     8     local ownerRef = params.ownerRef
+     8     local ownerValid, ownerReason = CZCraft.Owners.isValidOwnerRef(ownerRef)
+     8     if not ownerValid then
+*****0         return failResult('invalid ownerRef: ' .. tostring(ownerReason))
+           end
+     8     if plot.ownerType ~= ownerRef.type or plot.ownerId ~= ownerRef.id then
+     2         return failResult('plot owner context does not match the chosen ownerRef')
+           end
+
+           -- Membership still active.
+     6     local orgAccess = params.orgAccess
+     6     if type(orgAccess) ~= 'table' or not orgAccess.isStillMember then
+     2         return failResult('actor is no longer a member of the owning organization')
+           end
+
+           -- Cap (per-plot machineCap takes precedence over the global ORG cap).
+     4     local cap = plot.machineCap or (params.fixtureCaps and params.fixtureCaps[CZCraft.LocationType.ORG])
+     4     if type(cap) ~= 'number' or cap < 1 then
+*****0         return failResult('ORG machine cap is not configured')
+           end
+     4     local existing = countMachinesAtLocation(params.existingMachines, CZCraft.LocationType.ORG, plot.id)
+     4     if existing >= cap then
+     2         return failResult(('ORG plot machine cap reached (%d/%d)'):format(existing, cap))
+           end
+
+           -- Clearance.
+     4     local clearanceOk, clearanceReason = checkClearance(
+     2         params.existingMachines, CZCraft.LocationType.ORG, plot.id,
+     2         params.transform, machineConfig.placementClearance
+     2     )
+     2     if not clearanceOk then
+*****0         return failResult(clearanceReason)
+           end
+
+     4     return okResult(machineConfig, ownerRef, {
+     2         type = CZCraft.LocationType.ORG,
+     2         id = plot.id,
+           })
+       end
+
+       -- Pickup preconditions. The machine must be stopped, have no active cycle,
+       -- no active/paused bills, and zero stock + reservations.
+       -- @param machine table { operational_status, active_cycle_id, lifecycle }
+       -- @param activeBillsCount number bills that are enabled or paused (not removed)
+       -- @param stockTotal number sum of quantity across stock rows
+       -- @param reservedTotal number sum of reserved_quantity across stock rows
+       -- @return boolean ok
+       -- @return string|nil reason
+       local function validatePickup(machine, activeBillsCount, stockTotal, reservedTotal)
+    14     if type(machine) ~= 'table' then
+*****0         return false, 'machine must be a table'
+           end
+    14     if machine.lifecycle ~= Lifecycle.INSTALLED then
+     2         return false, 'machine must be INSTALLED to pick up (was ' .. tostring(machine.lifecycle) .. ')'
+           end
+    12     if machine.operational_status == OperationalStatus.RUNNING then
+     2         return false, 'machine is running; stop it before pickup'
+           end
+    10     if machine.active_cycle_id ~= nil then
+     2         return false, 'machine has an active cycle; let it finish before pickup'
+           end
+     8     if (activeBillsCount or 0) > 0 then
+     2         return false, 'machine has active or paused bills; pause/remove them before pickup'
+           end
+     6     if (stockTotal or 0) > 0 then
+     2         return false, 'machine stock must be empty before pickup'
+           end
+     4     if (reservedTotal or 0) > 0 then
+     2         return false, 'machine has reserved stock; clear reservations before pickup'
+           end
+     2     return true
+       end
+
+     4 CZCraft.Machines = {
+     4     Lifecycle = Lifecycle,
+     4     OperationalStatus = OperationalStatus,
+     4     validateTransform = validateTransform,
+     4     findMachineConfig = findMachineConfig,
+     4     pointInPolygon = pointInPolygon,
+     4     findPlotAt = findPlotAt,
+     4     countMachinesAtLocation = countMachinesAtLocation,
+     4     checkClearance = checkClearance,
+     4     validateHousePlacement = validateHousePlacement,
+     4     validateOrgPlacement = validateOrgPlacement,
+     4     validatePickup = validatePickup,
+     4     distance2D = distance2D,
+     4     distance3D = distance3D,
+     4 }
+
+     4 return CZCraft.Machines
+
+==============================================================================
+resources\[meus-scripts]\qb-czcraft\server\domain\owners.lua
+==============================================================================
+       -- qb-czcraft owner resolution (pure)
+       -- Resolves an ownerRef { type=PLAYER|JOB|GANG, id=string } from a chosen
+       -- context plus the acting player's job/gang. Side-effect-free so it can run
+       -- under stock Lua 5.4 in tests; the api layer passes real PlayerData in.
+
+     4 CZCraft = CZCraft or {}
+
+       -- Validates the structural shape of an ownerRef.
+       -- @param ownerRef table { type, id }
+       -- @return boolean ok
+       -- @return string|nil reason
+       local function isValidOwnerRef(ownerRef)
+    20     if type(ownerRef) ~= 'table' then
+*****0         return false, 'ownerRef must be a table'
+           end
+    20     local ownerType = ownerRef.type
+    20     if ownerType ~= CZCraft.OwnerType.PLAYER
+    12         and ownerType ~= CZCraft.OwnerType.JOB
+     6         and ownerType ~= CZCraft.OwnerType.GANG then
+     4         return false, 'ownerRef.type must be PLAYER, JOB or GANG'
+           end
+    16     if type(ownerRef.id) ~= 'string' or ownerRef.id == '' then
+     2         return false, 'ownerRef.id must be a nonempty string'
+           end
+    14     return true
+       end
+
+       -- Resolves the ownerRef for a placement/pickup action from the actor's chosen
+       -- context and live job/gang data.
+       --
+       -- @param context string 'CIVIL' | 'JOB' | 'GANG' (the context picker choice)
+       -- @param playerData table { citizenid, job={name}, gang={name} }
+       -- @return table|nil ownerRef
+       -- @return string|nil reason
+       local function resolveOwnerRef(context, playerData)
+    12     if context == 'CIVIL' then
+     2         if type(playerData) ~= 'table' or type(playerData.citizenid) ~= 'string' then
+*****0             return nil, 'CIVIL context requires a valid citizenid'
+               end
+     2         return { type = CZCraft.OwnerType.PLAYER, id = playerData.citizenid }
+           end
+
+    10     if context == 'JOB' then
+     4         local jobName = playerData and playerData.job and playerData.job.name
+     4         if type(jobName) ~= 'string' or jobName == '' or jobName == 'unemployed' then
+     2             return nil, 'JOB context requires an active non-unemployed job'
+               end
+     2         return { type = CZCraft.OwnerType.JOB, id = jobName }
+           end
+
+     6     if context == 'GANG' then
+     4         local gangName = playerData and playerData.gang and playerData.gang.name
+     4         if type(gangName) ~= 'string' or gangName == '' or gangName == 'none' then
+     2             return nil, 'GANG context requires an active gang'
+               end
+     2         return { type = CZCraft.OwnerType.GANG, id = gangName }
+           end
+
+     2     return nil, 'unknown context: ' .. tostring(context)
+       end
+
+     4 CZCraft.Owners = {
+     4     isValidOwnerRef = isValidOwnerRef,
+     4     resolveOwnerRef = resolveOwnerRef,
+     4 }
+
+     4 return CZCraft.Owners
+
+==============================================================================
+resources\[meus-scripts]\qb-czcraft\server\domain\permissions.lua
+==============================================================================
+       -- qb-czcraft permission resolution (pure)
+       -- Maps the six industrial permissions (OWNER|MANAGER|PRODUCTION|WITHDRAW|
+       -- DEPOSIT|VIEW) onto actor + location context. Side-effect-free: the api layer
+       -- injects house owner/keyholder lookups and live job/gang grade data.
+       --
+       -- HOUSE: owner or any keyholder of the house gets all six permissions
+       --   (inclusive of pickup). Placing as a keyholder associates the machine with
+       --   the house owner; pickup hands the item to whoever executes it.
+       -- ORG: grade grants from Config.Access.jobGrades/gangGrades, re-evaluated each
+       --   action. Losing membership revokes access immediately without altering ORG
+       --   ownership.
+
+     2 CZCraft = CZCraft or {}
+
+     2 local ALL_PERMISSIONS = {
+     2     [CZCraft.Permission.OWNER] = true,
+     2     [CZCraft.Permission.MANAGER] = true,
+     2     [CZCraft.Permission.PRODUCTION] = true,
+     2     [CZCraft.Permission.WITHDRAW] = true,
+     2     [CZCraft.Permission.DEPOSIT] = true,
+     2     [CZCraft.Permission.VIEW] = true,
+       }
+
+       -- Validates that a permission string is one of the six.
+       local function isKnownPermission(permission)
+    16     return ALL_PERMISSIONS[permission] == true
+       end
+
+       -- HOUSE permission resolution.
+       -- @param houseAccess table { isOwner = boolean, isKeyholder = boolean }
+       -- @return table set of granted permissions (or empty table if neither)
+       local function resolveHousePermissions(houseAccess)
+     6     if type(houseAccess) ~= 'table' then
+*****0         return {}
+           end
+     6     if houseAccess.isOwner or houseAccess.isKeyholder then
+               -- Owner and keyholders both get the full six-permission set.
+     4         local granted = {}
+    28         for permission in pairs(ALL_PERMISSIONS) do
+    24             granted[permission] = true
+               end
+     4         return granted
+           end
+     2     return {}
+       end
+
+       -- ORG permission resolution from grade grants.
+       -- @param ownerType 'JOB'|'GANG'
+       -- @param gradeKey string the grade key to look up in the grant map
+       -- @param accessConfig table Config.Access (jobGrades, gangGrades)
+       -- @return table set of granted permissions
+       local function resolveOrgPermissions(ownerType, gradeKey, accessConfig)
+     8     if type(accessConfig) ~= 'table' then
+*****0         return {}
+           end
+           local gradeMap
+     8     if ownerType == CZCraft.OwnerType.JOB then
+     6         gradeMap = accessConfig.jobGrades or {}
+     2     elseif ownerType == CZCraft.OwnerType.GANG then
+     2         gradeMap = accessConfig.gangGrades or {}
+           else
+*****0         return {}
+           end
+
+     8     local grants = gradeMap[gradeKey]
+     8     if type(grants) ~= 'table' then
+     4         return {}
+           end
+
+     4     local granted = {}
+    14     for _, permission in ipairs(grants) do
+    10         if isKnownPermission(permission) then
+    10             granted[permission] = true
+               end
+           end
+     4     return granted
+       end
+
+       -- Checks whether an actor holds a single permission given a resolved grant set.
+       local function hasPermission(grantedSet, permission)
+     6     return isKnownPermission(permission) and grantedSet[permission] == true
+       end
+
+       -- Checks that the actor's live membership still matches the machine's ownerRef.
+       -- Losing job/gang membership revokes ORG access immediately.
+       -- @param ownerRef table { type, id }
+       -- @param playerData table { job={name}, gang={name} }
+       -- @return boolean stillMember
+       local function isStillOrgMember(ownerRef, playerData)
+     8     if ownerRef.type == CZCraft.OwnerType.JOB then
+     4         local jobName = playerData and playerData.job and playerData.job.name
+     4         return jobName == ownerRef.id
+           end
+     4     if ownerRef.type == CZCraft.OwnerType.GANG then
+     2         local gangName = playerData and playerData.gang and playerData.gang.name
+     2         return gangName == ownerRef.id
+           end
+           -- PLAYER ownership is not membership-based.
+     2     return true
+       end
+
+     2 CZCraft.Permissions = {
+     2     isKnownPermission = isKnownPermission,
+     2     resolveHousePermissions = resolveHousePermissions,
+     2     resolveOrgPermissions = resolveOrgPermissions,
+     2     hasPermission = hasPermission,
+     2     isStillOrgMember = isStillOrgMember,
+     2 }
+
+     2 return CZCraft.Permissions
+
+==============================================================================
+resources\[meus-scripts]\qb-czcraft\server\domain\production.lua
+==============================================================================
+       -- qb-czcraft production domain (pure cycle state machine)
+       -- Cycle start: consume inputs + reserve output weight atomically.
+       -- Cycle complete: idempotent — same cycle_id/sequence never double-produces.
+       -- The repository layer persists the actual SQL rows; this module computes the
+       -- state transitions and validates preconditions.
+       --
+       -- Invariants (from overview.md):
+       --   - Input is consumed at cycle start; output weight is reserved in the same
+       --     commit.
+       --   - Cycle completion is idempotent: completing the same cycle_id/sequence
+       --     twice does not create additional outputs.
+       --   - Recipe hash/snapshot is persisted per cycle so later edits don't change
+       --     an in-flight cycle.
+
+     2 CZCraft = CZCraft or {}
+
+     2 local CycleStatus = {
+     2     PENDING = 'PENDING',
+     2     RUNNING = 'RUNNING',
+     2     COMPLETED = 'COMPLETED',
+     2     FAILED = 'FAILED',
+       }
+
+       -- Validates that a cycle can start: inputs must be available, output capacity
+       -- must accommodate the reserved output weight.
+       -- @param params table {
+       --   recipe = { inputs, outputs, duration, primaryOutput },
+       --   stockRows = { { item_name, quantity, reserved_quantity } },
+       --   machineUsedWeight, machineReservedWeight, machineCapacity,
+       --   itemWeights = { [item_name] = weight },
+       -- }
+       -- @return boolean ok
+       -- @return string|nil reason
+       -- @return table|nil computed = { inputsToConsume, outputsToReserve, reservedWeightDelta }
+       local function validateCycleStart(params)
+    12     if type(params) ~= 'table' then
+*****0         return false, 'params must be a table'
+           end
+    12     local recipe = params.recipe
+    12     if type(recipe) ~= 'table' then
+*****0         return false, 'recipe required'
+           end
+    12     if type(recipe.inputs) ~= 'table' or #recipe.inputs == 0 then
+*****0         return false, 'recipe.inputs must be a nonempty list'
+           end
+    12     if type(recipe.outputs) ~= 'table' or #recipe.outputs == 0 then
+*****0         return false, 'recipe.outputs must be a nonempty list'
+           end
+
+           -- Build a stock lookup by item_name.
+    12     local stockByItem = {}
+    12     if type(params.stockRows) == 'table' then
+    48         for _, row in ipairs(params.stockRows) do
+    36             if row and row.item_name then
+    36                 stockByItem[row.item_name] = {
+    36                     quantity = row.quantity or 0,
+    36                     reserved_quantity = row.reserved_quantity or 0,
+    36                 }
+                   end
+               end
+           end
+
+           -- Check input availability: quantity (not reserved) must be >= input amount.
+    12     local inputsToConsume = {}
+    28     for _, line in ipairs(recipe.inputs) do
+    20         local stock = stockByItem[line.item]
+    20         local available = stock and (stock.quantity - stock.reserved_quantity) or 0
+    20         if available < line.amount then
+     8             return false, ('insufficient input %s: have %d available, need %d'):format(
+     8                 line.item, available, line.amount)
+               end
+    16         inputsToConsume[#inputsToConsume + 1] = {
+    16             item_name = line.item,
+    16             amount = line.amount,
+    16         }
+           end
+
+           -- Compute output weight to reserve.
+     8     local itemWeights = params.itemWeights or {}
+     8     local outputsToReserve = {}
+     8     local reservedWeightDelta = 0
+    16     for _, line in ipairs(recipe.outputs) do
+     8         local weight = itemWeights[line.item] or 0
+     8         local lineWeight = weight * line.amount
+     8         reservedWeightDelta = reservedWeightDelta + lineWeight
+     8         outputsToReserve[#outputsToReserve + 1] = {
+     8             item_name = line.item,
+     8             amount = line.amount,
+     8             weight = lineWeight,
+     8         }
+           end
+
+           -- Check output capacity: used + reserved + new reserved <= capacity.
+     8     local usedWeight = params.machineUsedWeight or 0
+     8     local currentReserved = params.machineReservedWeight or 0
+     8     local capacity = params.machineCapacity or 0
+     8     if usedWeight + currentReserved + reservedWeightDelta > capacity then
+     4         return false, ('output cap: %d + %d + %d > %d'):format(
+     4             usedWeight, currentReserved, reservedWeightDelta, capacity)
+           end
+
+     6     return true, nil, {
+     6         inputsToConsume = inputsToConsume,
+     6         outputsToReserve = outputsToReserve,
+     6         reservedWeightDelta = reservedWeightDelta,
+     6     }
+       end
+
+       -- Computes the stock deltas for a cycle start (inputs consumed, outputs
+       -- reserved). Returns the row-level mutations the repository should apply.
+       -- @param computed table from validateCycleStart
+       -- @return table { stockDeltas = { { item_name, quantity_delta, reserved_delta } } }
+       local function computeStartDeltas(computed)
+     2     local deltas = {}
+
+           -- Inputs: quantity decreases, reserved unchanged.
+     6     for _, input in ipairs(computed.inputsToConsume) do
+     4         deltas[#deltas + 1] = {
+     4             item_name = input.item_name,
+     4             quantity_delta = -input.amount,
+     4             reserved_delta = 0,
+     4         }
+           end
+
+           -- Outputs: quantity unchanged (not yet produced), reserved increases.
+     4     for _, output in ipairs(computed.outputsToReserve) do
+     2         deltas[#deltas + 1] = {
+     2             item_name = output.item_name,
+     2             quantity_delta = 0,
+     2             reserved_delta = output.amount,
+     2         }
+           end
+
+     2     return { stockDeltas = deltas }
+       end
+
+       -- Computes the stock deltas for a cycle completion (reserved -> actual).
+       -- Idempotent: the repository checks that the cycle is in RUNNING state and
+       -- the cycle_id/sequence hasn't already been completed.
+       -- @param computed table from validateCycleStart
+       -- @return table { stockDeltas = { { item_name, quantity_delta, reserved_delta } } }
+       local function computeCompletionDeltas(computed)
+     2     local deltas = {}
+
+           -- Outputs: reserved decreases, quantity increases (reserved -> actual).
+     4     for _, output in ipairs(computed.outputsToReserve) do
+     2         deltas[#deltas + 1] = {
+     2             item_name = output.item_name,
+     2             quantity_delta = output.amount,
+     2             reserved_delta = -output.amount,
+     2         }
+           end
+
+     2     return { stockDeltas = deltas }
+       end
+
+       -- Checks whether a cycle completion is idempotent (not already completed).
+       -- @param cycle table { status, cycle_id, cycle_sequence }
+       -- @return boolean canComplete
+       -- @return string|nil reason
+       local function canCompleteCycle(cycle)
+     6     if type(cycle) ~= 'table' then
+*****0         return false, 'cycle must be a table'
+           end
+     6     if cycle.status == CycleStatus.COMPLETED then
+     2         return false, 'cycle already completed (idempotent no-op)'
+           end
+     4     if cycle.status ~= CycleStatus.RUNNING then
+     2         return false, 'cycle must be RUNNING to complete (was ' .. tostring(cycle.status) .. ')'
+           end
+     2     return true
+       end
+
+       -- Computes the next due time for a machine after completing a cycle.
+       -- @param completedAt number unix timestamp (seconds, UTC)
+       -- @param durationSeconds number recipe duration
+       -- @return number nextDueAt
+       local function computeNextDue(completedAt, durationSeconds)
+     6     return (completedAt or 0) + (durationSeconds or 0)
+       end
+
+     2 CZCraft.Production = {
+     2     CycleStatus = CycleStatus,
+     2     validateCycleStart = validateCycleStart,
+     2     computeStartDeltas = computeStartDeltas,
+     2     computeCompletionDeltas = computeCompletionDeltas,
+     2     canCompleteCycle = canCompleteCycle,
+     2     computeNextDue = computeNextDue,
+     2 }
+
+     2 return CZCraft.Production
+
+==============================================================================
+resources\[meus-scripts]\qb-czcraft\server\domain\scheduler.lua
+==============================================================================
+       -- qb-czcraft scheduler (pure heap + wake logic)
+       -- Global min-heap of due times keyed by machine_uuid. No per-machine loops.
+       -- The heap is rebuilt at startup from czcraft_machines.next_due_at. Indexed
+       -- polling is a recovery safety net only.
+
+     2 CZCraft = CZCraft or {}
+
+       -- A binary min-heap keyed by `due_at`.
+       -- Entries: { due_at = number, machine_uuid = string }
+     2 local Scheduler = {}
+
+       -- Creates a new empty heap.
+       -- @return table heap
+     2 function Scheduler.newHeap()
+    24     return { size = 0, entries = {} }
+       end
+
+       -- Swaps two heap entries.
+       local function swap(entries, i, j)
+    24     entries[i], entries[j] = entries[j], entries[i]
+       end
+
+       -- Bubbles an entry up from index i.
+       local function bubbleUp(entries, i)
+    74     while i > 1 do
+    44         local parent = math.floor(i / 2)
+    44         if entries[i].due_at < entries[parent].due_at then
+     8             swap(entries, i, parent)
+     8             i = parent
+               else
+                   break
+               end
+           end
+       end
+
+       -- Sinks an entry down from index i.
+       local function sinkDown(entries, size, i)
+           while true do
+    46         local left = i * 2
+    46         local right = left + 1
+    46         local smallest = i
+    46         if left <= size and entries[left].due_at < entries[smallest].due_at then
+    16             smallest = left
+               end
+    46         if right <= size and entries[right].due_at < entries[smallest].due_at then
+     4             smallest = right
+               end
+    46         if smallest ~= i then
+    16             swap(entries, i, smallest)
+    16             i = smallest
+               else
+                   break
+               end
+           end
+       end
+
+       -- Inserts an entry into the heap.
+       -- @param heap table
+       -- @param due_at number unix timestamp
+       -- @param machine_uuid string
+     2 function Scheduler.push(heap, due_at, machine_uuid)
+    66     local n = heap.size + 1
+    66     heap.size = n
+    66     heap.entries[n] = { due_at = due_at, machine_uuid = machine_uuid }
+    66     bubbleUp(heap.entries, n)
+       end
+
+       -- Pops the earliest-due entry from the heap.
+       -- @param heap table
+       -- @return table|nil { due_at, machine_uuid }
+     2 function Scheduler.pop(heap)
+    40     if heap.size == 0 then
+     2         return nil
+           end
+    38     local entries = heap.entries
+    38     local top = entries[1]
+    38     entries[1] = entries[heap.size]
+    38     entries[heap.size] = nil
+    38     heap.size = heap.size - 1
+    38     if heap.size > 0 then
+    28         sinkDown(entries, heap.size, 1)
+           end
+    38     return top
+       end
+
+       -- Peeks at the earliest-due entry without removing it.
+       -- @param heap table
+       -- @return table|nil
+     2 function Scheduler.peek(heap)
+    28     return heap.size > 0 and heap.entries[1] or nil
+       end
+
+       -- Removes a specific machine_uuid from the heap (for wake/re-heap).
+       -- Rebuilds the heap after removal. This is O(n) but wakes are infrequent
+       -- relative to cycle ticks.
+       -- @param heap table
+       -- @param machine_uuid string
+     2 function Scheduler.remove(heap, machine_uuid)
+     6     local entries = heap.entries
+     6     local found = nil
+    12     for i = 1, heap.size do
+    10         if entries[i].machine_uuid == machine_uuid then
+     4             found = i
+     4             break
+               end
+           end
+     6     if not found then return end
+
+           -- Replace with last, then rebuild.
+     4     entries[found] = entries[heap.size]
+     4     entries[heap.size] = nil
+     4     heap.size = heap.size - 1
+     4     if heap.size > 0 then
+               -- Rebuild the entire heap to maintain invariant.
+     6         for i = math.floor(heap.size / 2), 1, -1 do
+     2             sinkDown(entries, heap.size, i)
+               end
+           end
+       end
+
+       -- Re-heap a machine with a new due time (wake on stock/cycle/bill/config change).
+       -- @param heap table
+       -- @param machine_uuid string
+       -- @param due_at number
+     2 function Scheduler.wake(heap, machine_uuid, due_at)
+     2     Scheduler.remove(heap, machine_uuid)
+     2     Scheduler.push(heap, due_at, machine_uuid)
+       end
+
+       -- Rebuilds the heap from a list of { machine_uuid, next_due_at } rows.
+       -- Called at startup.
+       -- @param rows table
+       -- @return table heap
+     2 function Scheduler.buildFromRows(rows)
+     4     local heap = Scheduler.newHeap()
+     4     if type(rows) ~= 'table' then return heap end
+    16     for _, row in ipairs(rows) do
+    12         if row.machine_uuid and row.next_due_at then
+     8             Scheduler.push(heap, tonumber(row.next_due_at) or 0, row.machine_uuid)
+               end
+           end
+     4     return heap
+       end
+
+       -- Returns all machine_uuids whose due_at <= now, popping them from the heap.
+       -- Used by the scheduler tick to process due machines in chunks.
+       -- @param heap table
+       -- @param now number
+       -- @param maxCount number
+       -- @return table dueMachines = { { due_at, machine_uuid } }
+     2 function Scheduler.popDue(heap, now, maxCount)
+     6     local due = {}
+     6     local count = 0
+    18     while count < (maxCount or 100) do
+    16         local top = Scheduler.peek(heap)
+    16         if not top or top.due_at > now then
+                   break
+               end
+    12         Scheduler.pop(heap)
+    12         count = count + 1
+    12         due[count] = top
+           end
+     6     return due
+       end
+
+     2 CZCraft.Scheduler = Scheduler
+     2 return Scheduler
+
+==============================================================================
+resources\[meus-scripts]\qb-czcraft\server\schema_gate.lua
+==============================================================================
+       -- qb-czcraft schema-version gate (pure, testable)
+       --
+       -- Compares the applied czcraft_schema_version.version against the required
+       -- version and returns a structured result. The version reader is injected so
+       -- this module runs under stock Lua 5.4 in tests without FiveM or MySQL.
+       --
+       -- Fail-closed policy: missing table/query error, empty row, non-numeric,
+       -- negative, or below-required versions all return isReady = false. A newer
+       -- applied version is accepted (applied >= required).
+       --
+       -- The resource never applies DDL itself; this gate only reads.
+
+       local function isInteger(value)
+    34     return type(value) == 'number' and math.floor(value) == value and value >= 0
+       end
+
+       -- @param queryFn function(sql, params) -> number|nil  (must throw on error)
+       -- @param requiredVersion integer (CZCraft.REQUIRED_SCHEMA_VERSION)
+       -- @return table: { isReady, requiredVersion, appliedVersion, reason }
+       local function checkSchemaGate(queryFn, requiredVersion)
+    20     if not isInteger(requiredVersion) then
+     2         return {
+     2             isReady = false,
+     2             requiredVersion = requiredVersion,
+     2             appliedVersion = nil,
+     2             reason = 'required schema version is not a non-negative integer',
+     2         }
+           end
+
+    18     local ok, applied = pcall(queryFn, 'SELECT `version` FROM `czcraft_schema_version` WHERE `id` = 1', {})
+
+    18     if not ok then
+     2         return {
+     2             isReady = false,
+     2             requiredVersion = requiredVersion,
+     2             appliedVersion = nil,
+     2             reason = 'czcraft_schema_version is missing or unreadable: ' .. tostring(applied),
+     2         }
+           end
+
+    16     if applied == nil then
+     2         return {
+     2             isReady = false,
+     2             requiredVersion = requiredVersion,
+     2             appliedVersion = nil,
+     2             reason = 'czcraft_schema_version has no singleton row',
+     2         }
+           end
+
+    14     if not isInteger(applied) then
+     6         return {
+     6             isReady = false,
+     6             requiredVersion = requiredVersion,
+     6             appliedVersion = applied,
+     6             reason = 'czcraft_schema_version.version is not a non-negative integer',
+     6         }
+           end
+
+     8     if applied < requiredVersion then
+     2         return {
+     2             isReady = false,
+     2             requiredVersion = requiredVersion,
+     2             appliedVersion = applied,
+     2             reason = 'schema version ' .. tostring(applied) .. ' is behind required ' .. tostring(requiredVersion),
+     2         }
+           end
+
+     6     return {
+     6         isReady = true,
+     6         requiredVersion = requiredVersion,
+     6         appliedVersion = applied,
+     6         reason = nil,
+     6     }
+       end
+
+     2 CZCraft = CZCraft or {}
+     2 CZCraft.CheckSchemaGate = checkSchemaGate
+
+     2 return checkSchemaGate
+
+==============================================================================
+resources\[meus-scripts]\qb-czcraft\shared\constants.lua
+==============================================================================
+       -- qb-czcraft shared constants
+       -- Domain identifiers, permission vocabulary, and the unresolved-override sentinel.
+       -- This module is side-effect free so it can be loaded under stock Lua 5.4 in tests.
+
+    22 CZCraft = CZCraft or {}
+
+    22 CZCraft.VERSION = '0.1.0'
+
+       -- Required database schema version for this resource build.
+       -- Bootstrap compares this against czcraft_schema_version.version and stays
+       -- fully disabled when the applied version is missing, unreadable, or behind.
+       -- Migration 001_v0_1_core.sql stamps version 1.
+    22 CZCraft.REQUIRED_SCHEMA_VERSION = 1
+
+       -- Sentinel for required balance overrides that have not been supplied yet.
+       -- Validation must report any config value equal to this sentinel as an unresolved blocker.
+    22 CZCraft.UNRESOLVED = '__CZCRAFT_UNRESOLVED_OVERRIDE__'
+
+    22 CZCraft.OwnerType = {
+    22     PLAYER = 'PLAYER',
+    22     JOB = 'JOB',
+    22     GANG = 'GANG',
+    22 }
+
+    22 CZCraft.LocationType = {
+    22     HOUSE = 'HOUSE',
+    22     ORG = 'ORG',
+    22 }
+
+    22 CZCraft.Permission = {
+    22     OWNER = 'OWNER',
+    22     MANAGER = 'MANAGER',
+    22     PRODUCTION = 'PRODUCTION',
+    22     WITHDRAW = 'WITHDRAW',
+    22     DEPOSIT = 'DEPOSIT',
+    22     VIEW = 'VIEW',
+    22 }
+
+    22 CZCraft.AccessTag = {
+    22     CIVIL = 'CIVIL',
+    22     ORG_WEAPONS = 'ORG_WEAPONS',
+    22 }
+
+    22 CZCraft.MachineType = {
+    22     WORKBENCH = 'workbench',
+    22     REFINERY = 'refinery',
+    22     FABRICATOR = 'fabricator',
+    22     ASSEMBLY = 'assembly',
+    22 }
+
+       -- Approved placeholder prop models for the four MVP machines.
+       -- Config validation checks membership here instead of calling FiveM natives.
+       -- These are placeholders, not permanent art decisions.
+    22 CZCraft.ApprovedProps = {
+    22     prop_tool_bench02 = true,
+    22     gr_prop_gr_bench_01a = true,
+    22     gr_prop_gr_bench_03a = true,
+    22     prop_tool_bench02_ld = true,
+    22 }
+
+==============================================================================
+resources\[meus-scripts]\qb-czcraft\shared\recipe_catalog.lua
+==============================================================================
+       -- qb-czcraft recipe catalog builder
+       -- Pure, side-effect-free module that consumes the ordered recipe list and produces
+       -- lookups by recipe ID and machine type while preserving stable catalog order.
+       -- Detects malformed/duplicate IDs without silently overwriting entries and returns
+       -- structured errors for the validator to aggregate.
+       -- Does not implement cycle snapshots or recipe hashing (deferred to production integration).
+
+     2 CZCraft = CZCraft or {}
+
+       -- Builds a catalog from an ordered list of recipe definitions.
+       -- @param recipes table: ordered list of recipe tables (from config/recipes.lua)
+       -- @return table|nil catalog: { byId = {...}, byMachine = { machineType = {recipe,...} }, order = {...} }
+       -- @return table|nil errors: list of { path = string, message = string } entries
+     4 function CZCraft.buildRecipeCatalog(recipes)
+    42     if type(recipes) ~= 'table' then
+*****0         return nil, { { path = 'recipes', message = 'recipes must be a table/list' } }
+           end
+
+    42     local catalog = {
+    42         byId = {},
+    42         byMachine = {},
+    42         order = {},
+           }
+    42     local errors = {}
+
+   618     for index, recipe in ipairs(recipes) do
+   576         local path = 'recipes[' .. index .. ']'
+
+   576         if type(recipe) ~= 'table' then
+*****0             errors[#errors + 1] = { path = path, message = 'recipe entry must be a table' }
+                   goto continue
+               end
+
+   576         local id = recipe.id
+   576         if type(id) ~= 'string' or id == '' then
+     2             errors[#errors + 1] = { path = path .. '.id', message = 'recipe id must be a nonempty string' }
+     2             goto continue
+               end
+
+               -- Detect duplicate IDs without overwriting the first entry.
+   574         if catalog.byId[id] ~= nil then
+     2             errors[#errors + 1] = { path = path .. '.id', message = 'duplicate recipe id: ' .. id }
+     2             goto continue
+               end
+
+   572         local machine = recipe.machine
+   572         if type(machine) ~= 'string' or machine == '' then
+*****0             errors[#errors + 1] = { path = path .. '.machine', message = 'recipe machine must be a nonempty string' }
+                   goto continue
+               end
+
+   572         local entry = {
+   572             index = index,
+   572             recipe = recipe,
+               }
+
+   572         catalog.byId[id] = entry
+   572         catalog.order[#catalog.order + 1] = id
+
+   572         if not catalog.byMachine[machine] then
+   154             catalog.byMachine[machine] = {}
+               end
+   572         local machineList = catalog.byMachine[machine]
+   572         machineList[#machineList + 1] = entry
+
+               ::continue::
+           end
+
+    42     if #errors > 0 then
+     4         return nil, errors
+           end
+
+    38     return catalog, nil
+       end
+
+     2 return CZCraft.buildRecipeCatalog
+
+==============================================================================
+resources\[meus-scripts]\qb-czcraft\shared\recipe_snapshot.lua
+==============================================================================
+       -- qb-czcraft recipe snapshot (pure)
+       -- Builds a deterministic canonical string and a frozen snapshot table for a
+       -- recipe so an in-flight cycle is pinned to the exact inputs/outputs/duration/
+       -- cost that were configured when it started. Later recipe edits do not
+       -- retroactively change an in-flight cycle.
+       --
+       -- The canonical string is the hash pre-image; the repository computes the real
+       -- SHA-256 via SQL `SHA2(?, 256)` when persisting czcraft_active_cycles.
+       -- recipe_hash. This keeps shared/ side-effect-free (no native crypto) and
+       -- matches the existing inject-queryFn pattern.
+       --
+       -- Pinned fields (the ones that affect cycle outcome):
+       --   id, machine, duration, access, primaryOutput, inputs (item+amount),
+       --   outputs (item+amount). The `enabled` flag is NOT pinned because pausing/
+       --   disabling a recipe should stop the *next* cycle, not the in-flight one.
+
+     2 CZCraft = CZCraft or {}
+
+       -- Determines whether a value is a finite number.
+       local function isFiniteNumber(value)
+   100     return type(value) == 'number' and value == value and math.abs(value) ~= math.huge
+       end
+
+       -- Validates that a recipe has the minimum fields needed for a snapshot.
+       -- @param recipe table
+       -- @return boolean ok
+       -- @return string|nil reason
+       local function validateRecipeForSnapshot(recipe)
+   102     if type(recipe) ~= 'table' then
+*****0         return false, 'recipe must be a table'
+           end
+   102     if type(recipe.id) ~= 'string' or recipe.id == '' then
+     2         return false, 'recipe.id must be a nonempty string'
+           end
+   100     if type(recipe.machine) ~= 'string' or recipe.machine == '' then
+*****0         return false, 'recipe.machine must be a nonempty string'
+           end
+   100     if not isFiniteNumber(recipe.duration) or recipe.duration <= 0 then
+     2         return false, 'recipe.duration must be a positive finite number'
+           end
+    98     if type(recipe.inputs) ~= 'table' or #recipe.inputs == 0 then
+     2         return false, 'recipe.inputs must be a nonempty list'
+           end
+    96     if type(recipe.outputs) ~= 'table' or #recipe.outputs == 0 then
+*****0         return false, 'recipe.outputs must be a nonempty list'
+           end
+    96     if type(recipe.primaryOutput) ~= 'string' or recipe.primaryOutput == '' then
+*****0         return false, 'recipe.primaryOutput must be a nonempty string'
+           end
+    96     return true
+       end
+
+       -- Sorts an array of { item, amount } by item name for deterministic ordering.
+       local function sortedItemLines(lines)
+   124     local copy = {}
+   310     for _, line in ipairs(lines) do
+   186         copy[#copy + 1] = { item = line.item, amount = line.amount }
+           end
+   190     table.sort(copy, function(a, b) return a.item < b.item end)
+   124     return copy
+       end
+
+       -- Builds the deterministic canonical string for a recipe.
+       -- This is the hash pre-image: the repository computes SHA2(canonical, 256).
+       -- @param recipe table
+       -- @return string canonical
+       -- @return string|nil error  (nil on success)
+       local function canonicalRecipe(recipe)
+    68     local ok, reason = validateRecipeForSnapshot(recipe)
+    68     if not ok then
+     6         return nil, reason
+           end
+
+    62     local parts = {}
+    62     parts[#parts + 1] = 'id=' .. recipe.id
+    62     parts[#parts + 1] = 'machine=' .. recipe.machine
+    62     parts[#parts + 1] = 'duration=' .. tostring(recipe.duration)
+    62     parts[#parts + 1] = 'access=' .. tostring(recipe.access or '')
+    62     parts[#parts + 1] = 'primaryOutput=' .. recipe.primaryOutput
+
+           -- Inputs: sorted by item name for stable ordering.
+    62     local sortedInputs = sortedItemLines(recipe.inputs)
+    62     local inputParts = {}
+   184     for _, line in ipairs(sortedInputs) do
+   122         inputParts[#inputParts + 1] = line.item .. ':' .. tostring(line.amount)
+           end
+    62     parts[#parts + 1] = 'inputs=' .. table.concat(inputParts, ',')
+
+           -- Outputs: sorted by item name for stable ordering.
+    62     local sortedOutputs = sortedItemLines(recipe.outputs)
+    62     local outputParts = {}
+   126     for _, line in ipairs(sortedOutputs) do
+    64         outputParts[#outputParts + 1] = line.item .. ':' .. tostring(line.amount)
+           end
+    62     parts[#parts + 1] = 'outputs=' .. table.concat(outputParts, ',')
+
+    62     return table.concat(parts, '|')
+       end
+
+       -- Builds a frozen snapshot of the recipe fields that affect cycle outcome.
+       -- The snapshot is a deep copy of the pinned fields; the caller persists it as
+       -- JSON in czcraft_active_cycles.recipe_snapshot.
+       -- @param recipe table
+       -- @return table|nil snapshot
+       -- @return string|nil error
+       local function recipeSnapshot(recipe)
+    34     local ok, reason = validateRecipeForSnapshot(recipe)
+    34     if not ok then
+*****0         return nil, reason
+           end
+
+    34     local snapshot = {
+    34         id = recipe.id,
+    34         machine = recipe.machine,
+    34         duration = recipe.duration,
+    34         access = recipe.access,
+    34         primaryOutput = recipe.primaryOutput,
+    34         inputs = {},
+    34         outputs = {},
+           }
+   100     for _, line in ipairs(recipe.inputs) do
+    66         snapshot.inputs[#snapshot.inputs + 1] = { item = line.item, amount = line.amount }
+           end
+    68     for _, line in ipairs(recipe.outputs) do
+    34         snapshot.outputs[#snapshot.outputs + 1] = { item = line.item, amount = line.amount }
+           end
+    34     return snapshot
+       end
+
+       -- Computes the standard cost of a recipe from the input unit costs.
+       -- @param recipe table
+       -- @param inputCosts table { [item_name] = cost_per_unit }
+       -- @return number standardCost
+       local function standardCost(recipe, inputCosts)
+     8     if type(recipe) ~= 'table' or type(recipe.inputs) ~= 'table' then
+     4         return 0
+           end
+     4     local total = 0
+    12     for _, line in ipairs(recipe.inputs) do
+     8         local unitCost = inputCosts and inputCosts[line.item] or 0
+     8         if type(unitCost) == 'number' then
+     8             total = total + (unitCost * (line.amount or 0))
+               end
+           end
+     4     return total
+       end
+
+     2 CZCraft.RecipeSnapshot = {
+     2     validateRecipeForSnapshot = validateRecipeForSnapshot,
+     2     canonicalRecipe = canonicalRecipe,
+     2     recipeSnapshot = recipeSnapshot,
+     2     standardCost = standardCost,
+     2 }
+
+     2 return CZCraft.RecipeSnapshot
+
+==============================================================================
+resources\[meus-scripts]\qb-czcraft\shared\validation.lua
+==============================================================================
+       -- qb-czcraft configuration validator
+       -- Pure module: accepts the complete config plus an injected QBCore item registry and
+       -- returns a readiness result and ordered error list. Does not call natives, SQL, or
+       -- global QBCore state. Aggregates every failure in deterministic order.
+       -- Does not hardcode machine/recipe counts so later releases may extend configuration.
+
+     2 CZCraft = CZCraft or {}
+
+       -- Sentinel for NaN detection (NaN is the only value not equal to itself).
+       local function isNaN(value)
+  3762     return type(value) == 'number' and value ~= value
+       end
+
+       local function isFiniteNumber(value)
+    32     return type(value) == 'number' and not isNaN(value) and math.abs(value) ~= math.huge
+       end
+
+       local function isPositiveInteger(value)
+  4758     return type(value) == 'number' and value == math.floor(value) and value > 0
+       end
+
+       local function isPositiveNumber(value)
+   542     return type(value) == 'number' and not isNaN(value) and value > 0
+       end
+
+       local function isNonNegativeNumber(value)
+  3190     return type(value) == 'number' and not isNaN(value) and value >= 0
+       end
+
+       local function isUnresolved(value)
+   612     return value == CZCraft.UNRESOLVED
+       end
+
+       local function isBoolean(value)
+  1564     return type(value) == 'boolean'
+       end
+
+       local function isNonemptyString(value)
+ 11836     return type(value) == 'string' and value ~= ''
+       end
+
+       -- Collects keys of a hash table in sorted order for deterministic iteration.
+       local function sortedKeys(table_)
+*****0     local keys = {}
+*****0     for key in pairs(table_) do
+*****0         keys[#keys + 1] = key
+           end
+*****0     table.sort(keys)
+*****0     return keys
+       end
+
+       -- Builds a set from an array for membership checks.
+       local function arrayToSet(array)
+   272     local set = {}
+   272     if type(array) ~= 'table' then
+*****0         return set
+           end
+  1156     for _, value in ipairs(array) do
+   884         set[value] = true
+           end
+   272     return set
+       end
+
+       -- Validates the general configuration section.
+       local function validateGeneral(general, errors)
+    68     if type(general) ~= 'table' then
+*****0         errors[#errors + 1] = { path = 'general', message = 'general config must be a table' }
+*****0         return
+           end
+
+    68     if not isNonemptyString(general.resourceName) then
+*****0         errors[#errors + 1] = { path = 'general.resourceName', message = 'resourceName must be a nonempty string' }
+           end
+
+    68     if not isNonemptyString(general.version) then
+*****0         errors[#errors + 1] = { path = 'general.version', message = 'version must be a nonempty string' }
+           end
+
+    68     local features = general.features
+    68     if type(features) ~= 'table' then
+*****0         errors[#errors + 1] = { path = 'general.features', message = 'features must be a table' }
+           else
+    68         local expectedFlags = { 'placement', 'storageTransfers', 'bills', 'production', 'scheduler', 'nui', 'repairkit', 'admin' }
+   612         for _, flag in ipairs(expectedFlags) do
+   544             if not isBoolean(features[flag]) then
+     2                 errors[#errors + 1] = { path = 'general.features.' .. flag, message = 'feature flag must be a boolean' }
+                   end
+               end
+           end
+
+    68     local fixtureCaps = general.fixtureCaps
+    68     if type(fixtureCaps) ~= 'table' then
+*****0         errors[#errors + 1] = { path = 'general.fixtureCaps', message = 'fixtureCaps must be a table' }
+           else
+    68         local knownLocationTypes = arrayToSet({ CZCraft.LocationType.HOUSE, CZCraft.LocationType.ORG })
+   206         for key in pairs(fixtureCaps) do
+   138             if not knownLocationTypes[key] then
+     2                 errors[#errors + 1] = { path = 'general.fixtureCaps.' .. tostring(key), message = 'unknown location type in fixture caps' }
+                   end
+               end
+   204         for _, locType in ipairs({ CZCraft.LocationType.HOUSE, CZCraft.LocationType.ORG }) do
+   136             local cap = fixtureCaps[locType]
+   136             if cap == nil then
+*****0                 errors[#errors + 1] = { path = 'general.fixtureCaps.' .. locType, message = 'missing fixture cap for location type' }
+   136             elseif not isPositiveInteger(cap) then
+     2                 errors[#errors + 1] = { path = 'general.fixtureCaps.' .. locType, message = 'fixture cap must be a positive integer' }
+                   end
+               end
+           end
+
+    68     if isUnresolved(general.maxBillsPerMachine) then
+     4         errors[#errors + 1] = { path = 'general.maxBillsPerMachine', message = 'required override unresolved: max bills per machine' }
+    64     elseif not isPositiveInteger(general.maxBillsPerMachine) then
+     2         errors[#errors + 1] = { path = 'general.maxBillsPerMachine', message = 'maxBillsPerMachine must be a positive integer' }
+           end
+       end
+
+       -- Validates the machine definitions.
+       local function validateMachines(machines, errors)
+    68     if type(machines) ~= 'table' then
+*****0         errors[#errors + 1] = { path = 'machines', message = 'machines config must be a table/list' }
+*****0         return
+           end
+
+    68     local seenTypes = {}
+    68     local seenItems = {}
+    68     local seenProps = {}
+
+   340     for index, machine in ipairs(machines) do
+   272         local path = 'machines[' .. index .. ']'
+
+   272         if type(machine) ~= 'table' then
+*****0             errors[#errors + 1] = { path = path, message = 'machine entry must be a table' }
+                   goto continue
+               end
+
+   272         local machineType = machine.type
+   272         if not isNonemptyString(machineType) then
+*****0             errors[#errors + 1] = { path = path .. '.type', message = 'machine type must be a nonempty string' }
+   272         elseif seenTypes[machineType] then
+     2             errors[#errors + 1] = { path = path .. '.type', message = 'duplicate machine type: ' .. machineType }
+               else
+   270             seenTypes[machineType] = true
+               end
+
+   272         if not isNonemptyString(machine.displayKey) then
+*****0             errors[#errors + 1] = { path = path .. '.displayKey', message = 'displayKey must be a nonempty string' }
+               end
+
+   272         local item = machine.item
+   272         if not isNonemptyString(item) then
+*****0             errors[#errors + 1] = { path = path .. '.item', message = 'machine item must be a nonempty string' }
+   272         elseif seenItems[item] then
+     2             errors[#errors + 1] = { path = path .. '.item', message = 'duplicate machine item: ' .. item }
+               else
+   270             seenItems[item] = true
+               end
+
+   272         if not isPositiveInteger(machine.price) then
+*****0             errors[#errors + 1] = { path = path .. '.price', message = 'price must be a positive integer' }
+               end
+
+   272         if not isPositiveInteger(machine.stockCapacity) then
+*****0             errors[#errors + 1] = { path = path .. '.stockCapacity', message = 'stockCapacity must be a positive integer' }
+               end
+
+   272         local prop = machine.prop
+   272         if not isNonemptyString(prop) then
+*****0             errors[#errors + 1] = { path = path .. '.prop', message = 'prop must be a nonempty string' }
+   272         elseif not CZCraft.ApprovedProps[prop] then
+     2             errors[#errors + 1] = { path = path .. '.prop', message = 'prop not in approved allow-list: ' .. tostring(prop) }
+               end
+
+   272         if isUnresolved(machine.itemWeight) then
+     6             errors[#errors + 1] = { path = path .. '.itemWeight', message = 'required override unresolved: machine item weight' }
+   266         elseif not isPositiveNumber(machine.itemWeight) then
+*****0             errors[#errors + 1] = { path = path .. '.itemWeight', message = 'itemWeight must be a positive number' }
+               end
+
+   272         if isUnresolved(machine.placementClearance) then
+     2             errors[#errors + 1] = { path = path .. '.placementClearance', message = 'required override unresolved: placement clearance' }
+   270         elseif not isPositiveNumber(machine.placementClearance) then
+*****0             errors[#errors + 1] = { path = path .. '.placementClearance', message = 'placementClearance must be a positive number' }
+               end
+
+               ::continue::
+           end
+       end
+
+       -- Validates a single inputs or outputs array of a recipe.
+       local function validateItemLines(lines, sideName, recipePath, errors)
+  2040     if type(lines) ~= 'table' then
+*****0         errors[#errors + 1] = { path = recipePath .. '.' .. sideName, message = sideName .. ' must be a table/list' }
+*****0         return
+           end
+
+  2040     if #lines == 0 then
+     4         errors[#errors + 1] = { path = recipePath .. '.' .. sideName, message = sideName .. ' must not be empty' }
+     4         return
+           end
+
+  2036     local seenItems = {}
+
+  5024     for lineIndex, line in ipairs(lines) do
+  2988         local linePath = recipePath .. '.' .. sideName .. '[' .. lineIndex .. ']'
+
+  2988         if type(line) ~= 'table' then
+*****0             errors[#errors + 1] = { path = linePath, message = 'item line must be a table' }
+                   goto continue
+               end
+
+  2988         local item = line.item
+  2988         if not isNonemptyString(item) then
+*****0             errors[#errors + 1] = { path = linePath .. '.item', message = 'item must be a nonempty string' }
+  2988         elseif seenItems[item] then
+     2             errors[#errors + 1] = { path = linePath .. '.item', message = 'duplicate item in ' .. sideName .. ': ' .. item }
+               else
+  2986             seenItems[item] = true
+               end
+
+  2988         if not isPositiveInteger(line.amount) then
+     2             errors[#errors + 1] = { path = linePath .. '.amount', message = 'amount must be a positive integer' }
+               end
+
+               ::continue::
+           end
+       end
+
+       -- Validates the recipe catalog structure (not cross-references).
+       local function validateRecipes(recipes, knownMachineTypes, knownAccessTags, errors)
+    68     if type(recipes) ~= 'table' then
+*****0         errors[#errors + 1] = { path = 'recipes', message = 'recipes config must be a table/list' }
+*****0         return
+           end
+
+    68     local seenIds = {}
+
+  1088     for index, recipe in ipairs(recipes) do
+  1020         local path = 'recipes[' .. index .. ']'
+
+  1020         if type(recipe) ~= 'table' then
+*****0             errors[#errors + 1] = { path = path, message = 'recipe entry must be a table' }
+                   goto continue
+               end
+
+  1020         local id = recipe.id
+  1020         if not isNonemptyString(id) then
+*****0             errors[#errors + 1] = { path = path .. '.id', message = 'recipe id must be a nonempty string' }
+  1020         elseif seenIds[id] then
+     2             errors[#errors + 1] = { path = path .. '.id', message = 'duplicate recipe id: ' .. id }
+               else
+  1018             seenIds[id] = true
+               end
+
+  1020         local machine = recipe.machine
+  1020         if not isNonemptyString(machine) then
+*****0             errors[#errors + 1] = { path = path .. '.machine', message = 'machine must be a nonempty string' }
+  1020         elseif not knownMachineTypes[machine] then
+    10             errors[#errors + 1] = { path = path .. '.machine', message = 'unknown machine type: ' .. tostring(machine) }
+               end
+
+  1020         if not isBoolean(recipe.enabled) then
+*****0             errors[#errors + 1] = { path = path .. '.enabled', message = 'enabled must be a boolean' }
+               end
+
+  1020         local access = recipe.access
+  1020         if not isNonemptyString(access) then
+*****0             errors[#errors + 1] = { path = path .. '.access', message = 'access must be a nonempty string' }
+  1020         elseif not knownAccessTags[access] then
+     2             errors[#errors + 1] = { path = path .. '.access', message = 'unknown access tag: ' .. tostring(access) }
+               end
+
+  1020         if not isPositiveInteger(recipe.duration) then
+     4             errors[#errors + 1] = { path = path .. '.duration', message = 'duration must be a positive integer' }
+               end
+
+  1020         validateItemLines(recipe.inputs, 'inputs', path, errors)
+  1020         validateItemLines(recipe.outputs, 'outputs', path, errors)
+
+  1020         local primaryOutput = recipe.primaryOutput
+  1020         if not isNonemptyString(primaryOutput) then
+*****0             errors[#errors + 1] = { path = path .. '.primaryOutput', message = 'primaryOutput must be a nonempty string' }
+               else
+  1020             local foundInOutputs = false
+  1020             if type(recipe.outputs) == 'table' then
+  1022                 for _, outputLine in ipairs(recipe.outputs) do
+  1018                     if type(outputLine) == 'table' and outputLine.item == primaryOutput then
+  1016                         foundInOutputs = true
+  1016                         break
+                           end
+                       end
+                   end
+  1020             if not foundInOutputs then
+     4                 errors[#errors + 1] = { path = path .. '.primaryOutput', message = 'primaryOutput not found in outputs: ' .. primaryOutput }
+                   end
+               end
+
+               ::continue::
+           end
+       end
+
+       -- Validates cross-references against the injected item registry.
+       local function validateItemReferences(machines, recipes, itemRegistry, errors)
+    68     if type(itemRegistry) ~= 'table' then
+*****0         errors[#errors + 1] = { path = 'itemRegistry', message = 'item registry must be a table' }
+*****0         return
+           end
+
+           local function checkItem(itemName, path)
+  2988         local entry = itemRegistry[itemName]
+  2988         if entry == nil then
+    60             errors[#errors + 1] = { path = path, message = 'missing QBCore item: ' .. itemName }
+    60             return
+               end
+  2928         if type(entry) ~= 'table' then
+*****0             errors[#errors + 1] = { path = path, message = 'item registry entry is not a table: ' .. itemName }
+*****0             return
+               end
+  2928         local weight = entry.weight
+  2928         if not isNonNegativeNumber(weight) then
+*****0             errors[#errors + 1] = { path = path, message = 'item has unusable weight for stock calculations: ' .. itemName }
+               end
+           end
+
+           -- Machine packed items.
+   340     for index, machine in ipairs(machines or {}) do
+   272         if type(machine) == 'table' and isNonemptyString(machine.item) then
+   272             local path = 'machines[' .. index .. '].item'
+   272             local entry = itemRegistry[machine.item]
+   272             if entry == nil then
+    10                 errors[#errors + 1] = { path = path, message = 'missing QBCore item: ' .. machine.item }
+   262             elseif type(entry) ~= 'table' then
+*****0                 errors[#errors + 1] = { path = path, message = 'item registry entry is not a table: ' .. machine.item }
+                   else
+   262                 local weight = entry.weight
+   262                 if not isNonNegativeNumber(weight) then
+     2                     errors[#errors + 1] = { path = path, message = 'machine item has unusable weight: ' .. machine.item }
+                       end
+   262                 if entry.unique ~= true then
+     2                     errors[#errors + 1] = { path = path, message = 'machine item must be unique=true: ' .. machine.item }
+                       end
+                   end
+               end
+           end
+
+           -- Recipe input/output items.
+  1088     for index, recipe in ipairs(recipes or {}) do
+  1020         if type(recipe) == 'table' then
+  1020             local recipePath = 'recipes[' .. index .. ']'
+  1020             if type(recipe.inputs) == 'table' then
+  2990                 for lineIndex, line in ipairs(recipe.inputs) do
+  1970                     if type(line) == 'table' and isNonemptyString(line.item) then
+  1970                         checkItem(line.item, recipePath .. '.inputs[' .. lineIndex .. '].item')
+                           end
+                       end
+                   end
+  1020             if type(recipe.outputs) == 'table' then
+  2038                 for lineIndex, line in ipairs(recipe.outputs) do
+  1018                     if type(line) == 'table' and isNonemptyString(line.item) then
+  1018                         checkItem(line.item, recipePath .. '.outputs[' .. lineIndex .. '].item')
+                           end
+                       end
+                   end
+               end
+           end
+       end
+
+       -- Validates the access configuration.
+       local function validateAccess(access, errors)
+    68     if type(access) ~= 'table' then
+*****0         errors[#errors + 1] = { path = 'access', message = 'access config must be a table' }
+*****0         return
+           end
+
+    68     local knownOwnerTypes = arrayToSet({ CZCraft.OwnerType.PLAYER, CZCraft.OwnerType.JOB, CZCraft.OwnerType.GANG })
+   136     local knownPermissions = arrayToSet({
+    68         CZCraft.Permission.OWNER,
+    68         CZCraft.Permission.MANAGER,
+    68         CZCraft.Permission.PRODUCTION,
+    68         CZCraft.Permission.WITHDRAW,
+    68         CZCraft.Permission.DEPOSIT,
+    68         CZCraft.Permission.VIEW,
+    68     })
+
+    68     if type(access.ownerTypes) == 'table' then
+   272         for _, ownerType in ipairs(access.ownerTypes) do
+   204             if not knownOwnerTypes[ownerType] then
+*****0                 errors[#errors + 1] = { path = 'access.ownerTypes', message = 'unknown owner type: ' .. tostring(ownerType) }
+                   end
+               end
+           else
+*****0         errors[#errors + 1] = { path = 'access.ownerTypes', message = 'ownerTypes must be a table/list' }
+           end
+
+    68     if type(access.permissions) == 'table' then
+   476         for _, permission in ipairs(access.permissions) do
+   408             if not knownPermissions[permission] then
+*****0                 errors[#errors + 1] = { path = 'access.permissions', message = 'unknown permission: ' .. tostring(permission) }
+                   end
+               end
+           else
+*****0         errors[#errors + 1] = { path = 'access.permissions', message = 'permissions must be a table/list' }
+           end
+
+           -- Validate grade grant maps. Empty deny-all maps are valid.
+   204     for _, gradeMapName in ipairs({ 'jobGrades', 'gangGrades' }) do
+   136         local gradeMap = access[gradeMapName]
+   136         if gradeMap ~= nil then
+   136             if type(gradeMap) ~= 'table' then
+*****0                 errors[#errors + 1] = { path = 'access.' .. gradeMapName, message = gradeMapName .. ' must be a table' }
+                   else
+   138                 for gradeKey, grants in pairs(gradeMap) do
+     2                     if type(grants) ~= 'table' then
+*****0                         errors[#errors + 1] = { path = 'access.' .. gradeMapName .. '.' .. tostring(gradeKey), message = 'grade grant map must be a table' }
+                           else
+     6                         for _, permission in ipairs(grants) do
+     4                             if not knownPermissions[permission] then
+     2                                 errors[#errors + 1] = { path = 'access.' .. gradeMapName .. '.' .. tostring(gradeKey), message = 'unknown permission in grade grants: ' .. tostring(permission) }
+                                   end
+                               end
+                           end
+                       end
+                   end
+               end
+           end
+
+           -- Validate access tags.
+    68     if type(access.tags) ~= 'table' then
+*****0         errors[#errors + 1] = { path = 'access.tags', message = 'tags must be a table' }
+           else
+   204         for tagName, tagConfig in pairs(access.tags) do
+   136             local tagPath = 'access.tags.' .. tostring(tagName)
+   136             if type(tagConfig) ~= 'table' then
+*****0                 errors[#errors + 1] = { path = tagPath, message = 'tag config must be a table' }
+                   else
+   136                 if type(tagConfig.jobs) ~= 'table' then
+*****0                     errors[#errors + 1] = { path = tagPath .. '.jobs', message = 'jobs must be a table/list' }
+                       end
+   136                 if type(tagConfig.gangs) ~= 'table' then
+*****0                     errors[#errors + 1] = { path = tagPath .. '.gangs', message = 'gangs must be a table/list' }
+                       end
+                   end
+               end
+           end
+       end
+
+       -- Validates plot entries only when present. Empty collection is valid.
+       local function validatePlots(plots, errors)
+    68     if plots == nil then
+*****0         return
+           end
+
+    68     if type(plots) ~= 'table' then
+*****0         errors[#errors + 1] = { path = 'plots', message = 'plots config must be a table/list' }
+*****0         return
+           end
+
+           -- Empty collection is valid at scaffold time.
+    68     if #plots == 0 then
+    62         return
+           end
+
+     6     local seenIds = {}
+
+    12     for index, plot in ipairs(plots) do
+     6         local path = 'plots[' .. index .. ']'
+
+     6         if type(plot) ~= 'table' then
+*****0             errors[#errors + 1] = { path = path, message = 'plot entry must be a table' }
+                   goto continue
+               end
+
+     6         local id = plot.id
+     6         if not isNonemptyString(id) then
+*****0             errors[#errors + 1] = { path = path .. '.id', message = 'plot id must be a nonempty string' }
+     6         elseif seenIds[id] then
+*****0             errors[#errors + 1] = { path = path .. '.id', message = 'duplicate plot id: ' .. id }
+               else
+     6             seenIds[id] = true
+               end
+
+     6         local ownerType = plot.ownerType
+     6         if ownerType ~= CZCraft.OwnerType.JOB and ownerType ~= CZCraft.OwnerType.GANG then
+     2             errors[#errors + 1] = { path = path .. '.ownerType', message = 'plot ownerType must be JOB or GANG' }
+               end
+
+     6         if not isNonemptyString(plot.ownerId) then
+*****0             errors[#errors + 1] = { path = path .. '.ownerId', message = 'plot ownerId must be a nonempty string' }
+               end
+
+     6         local zBounds = plot.zBounds
+     6         if type(zBounds) ~= 'table' then
+*****0             errors[#errors + 1] = { path = path .. '.zBounds', message = 'zBounds must be a table' }
+               else
+     6             if not isFiniteNumber(zBounds.min) then
+     2                 errors[#errors + 1] = { path = path .. '.zBounds.min', message = 'zBounds.min must be a finite number' }
+                   end
+     6             if not isFiniteNumber(zBounds.max) then
+*****0                 errors[#errors + 1] = { path = path .. '.zBounds.max', message = 'zBounds.max must be a finite number' }
+                   end
+               end
+
+     6         local polygon = plot.polygon
+     6         if type(polygon) ~= 'table' or #polygon == 0 then
+*****0             errors[#errors + 1] = { path = path .. '.polygon', message = 'polygon must be a nonempty list of points' }
+               else
+    16             for pointIndex, point in ipairs(polygon) do
+    10                 local pointPath = path .. '.polygon[' .. pointIndex .. ']'
+    10                 if type(point) ~= 'table' then
+*****0                     errors[#errors + 1] = { path = pointPath, message = 'polygon point must be a table' }
+                       else
+    10                     if not isFiniteNumber(point.x) then
+     2                         errors[#errors + 1] = { path = pointPath .. '.x', message = 'polygon x must be a finite number' }
+                           end
+    10                     if not isFiniteNumber(point.y) then
+*****0                         errors[#errors + 1] = { path = pointPath .. '.y', message = 'polygon y must be a finite number' }
+                           end
+                       end
+                   end
+               end
+
+     6         if not isPositiveInteger(plot.machineCap) then
+*****0             errors[#errors + 1] = { path = path .. '.machineCap', message = 'machineCap must be a positive integer' }
+               end
+
+     6         if not isPositiveNumber(plot.placementClearance) then
+*****0             errors[#errors + 1] = { path = path .. '.placementClearance', message = 'placementClearance must be a positive number' }
+               end
+
+               ::continue::
+           end
+       end
+
+       -- Public entry point: validates the complete config against an injected item registry.
+       -- @param config table: { General, Machines, Access, Plots, Recipes }
+       -- @param itemRegistry table: QBCore.Shared.Items-like hash table
+       -- @return table: { isReady = boolean, errors = { {path, message}, ... } }
+     4 function CZCraft.validateConfig(config, itemRegistry)
+    68     local errors = {}
+
+    68     if type(config) ~= 'table' then
+*****0         return { isReady = false, errors = { { path = 'config', message = 'config must be a table' } } }
+           end
+
+    68     validateGeneral(config.General, errors)
+    68     validateMachines(config.Machines, errors)
+
+    68     local knownMachineTypes = {}
+    68     if type(config.Machines) == 'table' then
+   340         for _, machine in ipairs(config.Machines) do
+   272             if type(machine) == 'table' and isNonemptyString(machine.type) then
+   272                 knownMachineTypes[machine.type] = true
+                   end
+               end
+           end
+
+    68     local knownAccessTags = arrayToSet({ CZCraft.AccessTag.CIVIL, CZCraft.AccessTag.ORG_WEAPONS })
+    68     validateRecipes(config.Recipes, knownMachineTypes, knownAccessTags, errors)
+    68     validateItemReferences(config.Machines, config.Recipes, itemRegistry, errors)
+    68     validateAccess(config.Access, errors)
+    68     validatePlots(config.Plots, errors)
+
+    68     return { isReady = #errors == 0, errors = errors }
+       end
+
+     2 return CZCraft.validateConfig
+
+==============================================================================
+resources\[qb]\qb-inventory\server\idempotent_batch.lua
+==============================================================================
+       -- qb-inventory idempotent batch validator (pure, testable)
+       --
+       -- Side-effect-free module that validates a batch of removals + additions
+       -- against a player's inventory clone and produces the canonical payload string
+       -- used as the SHA2 input for replay detection. Loadable via dofile under stock
+       -- Lua 5.4: no FiveM or MySQL globals are referenced.
+       --
+       -- validateBatch deep-copies the supplied itemsClone, applies removals then
+       -- additions to the copy, and validates every step. The input clone is never
+       -- mutated, even on failure (the function works on an internal deep copy).
+       --
+       -- Shape contract (mirrors qb-inventory item rows + QBCore.Shared.Items):
+       --   items[slot] = { name, amount, info, label, weight, type, unique, slot, ... }
+       --   itemRegistry[name] = { name, weight, unique, type, label, ... }  (name lowercased)
+       --   removals[i]  = { item = string, amount = integer, slot = integer|nil, metadata = table|nil }
+       --   additions[i] = { item = string, amount = integer, slot = integer|nil, info = table|nil }
+       --   constraints  = { maxWeight = number, maxSlots = number }
+
+       local function isPositiveInteger(value)
+   168     return type(value) == 'number'
+   166         and math.floor(value) == value
+   164         and value > 0
+   156         and value ~= math.huge
+   154         and value ~= -math.huge
+   168         and value == value -- reject NaN
+       end
+
+       local function isFiniteNumber(value)
+    80     return type(value) == 'number'
+    80         and value ~= math.huge
+    80         and value ~= -math.huge
+    80         and value == value
+       end
+
+       -- Deep copy that preserves array-vs-map distinction via numeric keys.
+       local function deepCopy(value)
+  1110     if type(value) ~= 'table' then return value end
+   232     local copy = {}
+  1252     for k, v in pairs(value) do
+  1020         copy[k] = deepCopy(v)
+           end
+   232     return copy
+       end
+
+       -- Structural equality for metadata/info comparison.
+       local function deepEqual(a, b)
+     8     if type(a) ~= type(b) then return false end
+     8     if type(a) ~= 'table' then return a == b end
+     6     for k, v in pairs(a) do
+     4         if not deepEqual(v, b[k]) then return false end
+           end
+     4     for k in pairs(b) do
+     2         if a[k] == nil then return false end
+           end
+     2     return true
+       end
+
+       local function totalWeight(items)
+    30     local weight = 0
+    58     for _, item in pairs(items) do
+    28         local amount = item.amount
+    28         if type(amount) ~= 'number' then amount = 1 end
+    28         weight = weight + (item.weight * amount)
+           end
+    30     return weight
+       end
+
+       local function usedSlotCount(items)
+    14     local count = 0
+    26     for _, item in pairs(items) do
+    12         if item then count = count + 1 end
+           end
+    14     return count
+       end
+
+       local function firstFreeSlot(items, maxSlots)
+    34     for i = 1, maxSlots do
+    28         if items[i] == nil then return i end
+           end
+     6     return nil
+       end
+
+       local function firstSlotByName(items, itemName)
+    38     local target = tostring(itemName):lower()
+    52     for slot, item in pairs(items) do
+    36         if item and item.name:lower() == target then
+    22             return slot
+               end
+           end
+    16     return nil
+       end
+
+       local function makeError(path, message)
+    56     return { path = path, message = message }
+       end
+
+       -- Apply + validate a single removal against the working copy.
+       -- Returns true on success, or { path, message } on failure.
+       local function applyRemoval(items, removal, constraints, itemRegistry, index)
+    40     local path = 'removals[' .. index .. ']'
+    40     local itemName = removal.item
+    40     local amount = removal.amount
+
+    40     if type(itemName) ~= 'string' or itemName == '' then
+     4         return makeError(path, 'item must be a non-empty string')
+           end
+    36     if not isPositiveInteger(amount) then
+     8         return makeError(path, 'amount must be a positive integer')
+           end
+    28     if not itemRegistry[itemName:lower()] then
+     2         return makeError(path, 'item "' .. itemName .. '" is not in the registry')
+           end
+
+    26     local slot = removal.slot
+    26     if slot ~= nil then
+     4         if not isPositiveInteger(slot) or slot > constraints.maxSlots then
+     2             return makeError(path, 'slot out of range [1, ' .. constraints.maxSlots .. ']')
+               end
+           end
+
+           local targetSlot
+    24     if slot then
+     2         targetSlot = slot
+           else
+    22         targetSlot = firstSlotByName(items, itemName)
+           end
+
+    24     local target = targetSlot and items[targetSlot]
+    24     if not target or target.name:lower() ~= itemName:lower() then
+     2         return makeError(path, 'item not present in inventory')
+           end
+
+    22     if removal.metadata ~= nil then
+     4         if not deepEqual(target.info, removal.metadata) then
+     2             return makeError(path, 'metadata does not match stored info')
+               end
+           end
+
+    20     if target.amount < amount then
+     4         return makeError(path, 'not enough items in slot (have ' .. tostring(target.amount) .. ', need ' .. tostring(amount) .. ')')
+           end
+
+    16     target.amount = target.amount - amount
+    16     if target.amount <= 0 then
+     2         items[targetSlot] = nil
+           end
+    16     return true
+       end
+
+       -- Apply + validate a single addition against the working copy.
+       -- Returns true on success, or { path, message } on failure.
+       local function applyAddition(items, addition, constraints, itemRegistry, index)
+    40     local path = 'additions[' .. index .. ']'
+    40     local itemName = addition.item
+    40     local amount = addition.amount
+
+    40     if type(itemName) ~= 'string' or itemName == '' then
+     2         return makeError(path, 'item must be a non-empty string')
+           end
+    38     local itemInfo = itemRegistry[itemName:lower()]
+    38     if not itemInfo then
+     2         return makeError(path, 'item "' .. itemName .. '" is not in the registry')
+           end
+    36     if not isPositiveInteger(amount) then
+     2         return makeError(path, 'amount must be a positive integer')
+           end
+
+    34     local slot = addition.slot
+    34     if slot ~= nil then
+    12         if not isPositiveInteger(slot) or slot > constraints.maxSlots then
+     4             return makeError(path, 'slot out of range [1, ' .. constraints.maxSlots .. ']')
+               end
+           end
+
+    30     local addedWeight = itemInfo.weight * amount
+    30     if totalWeight(items) + addedWeight > constraints.maxWeight then
+     2         return makeError(path, 'addition exceeds max weight')
+           end
+
+    28     local isUnique = itemInfo.unique == true
+           local targetSlot
+    28     local stacked = false
+
+    28     if slot then
+     8         local existing = items[slot]
+     8         if existing then
+     6             if isUnique then
+     2                 return makeError(path, 'unique item cannot stack into an occupied slot')
+                   end
+     4             if existing.name:lower() ~= itemName:lower() then
+     2                 return makeError(path, 'slot occupied by a different item')
+                   end
+     2             targetSlot = slot
+     2             stacked = true
+               else
+     2             targetSlot = slot
+               end
+    20     elseif not isUnique then
+    16         local existingSlot = firstSlotByName(items, itemName)
+    16         if existingSlot then
+     2             targetSlot = existingSlot
+     2             stacked = true
+               else
+    14             targetSlot = firstFreeSlot(items, constraints.maxSlots)
+               end
+           else
+     4         targetSlot = firstFreeSlot(items, constraints.maxSlots)
+           end
+
+    24     if not targetSlot then
+     6         return makeError(path, 'no free slot available')
+           end
+
+    18     if not stacked then
+    14         if items[targetSlot] ~= nil then
+*****0             return makeError(path, 'target slot is not free')
+               end
+    14         if usedSlotCount(items) + 1 > constraints.maxSlots then
+*****0             return makeError(path, 'addition exceeds max slots')
+               end
+    14         items[targetSlot] = {
+    14             name = itemInfo.name,
+    14             amount = amount,
+    14             info = deepCopy(addition.info) or {},
+    14             label = itemInfo.label,
+    14             description = itemInfo.description or '',
+    14             weight = itemInfo.weight,
+    14             type = itemInfo.type,
+    14             unique = itemInfo.unique,
+    14             useable = itemInfo.useable,
+    14             image = itemInfo.image,
+    14             shouldClose = itemInfo.shouldClose,
+    14             slot = targetSlot,
+    14             combinable = itemInfo.combinable,
+    14         }
+           else
+     4         items[targetSlot].amount = items[targetSlot].amount + amount
+           end
+
+    18     return true
+       end
+
+       -- @param itemsClone table  player inventory keyed by slot (not mutated)
+       -- @param removals   table  array of removal descriptors
+       -- @param additions  table  array of addition descriptors
+       -- @param constraints table { maxWeight, maxSlots }
+       -- @param itemRegistry table QBCore.Shared.Items (lowercased name keys)
+       -- @return table { ok = true, items = newItems } | { ok = false, errors = {...} }
+       local function validateBatch(itemsClone, removals, additions, constraints, itemRegistry)
+    82     if type(itemsClone) ~= 'table' then
+     2         return { ok = false, errors = { makeError('items', 'itemsClone must be a table') } }
+           end
+    80     if type(constraints) ~= 'table'
+    80         or not isFiniteNumber(constraints.maxWeight)
+    80         or not isPositiveInteger(constraints.maxSlots) then
+     2         return { ok = false, errors = { makeError('constraints', 'constraints must be { maxWeight, maxSlots }') } }
+           end
+    78     if type(itemRegistry) ~= 'table' then
+     2         return { ok = false, errors = { makeError('itemRegistry', 'itemRegistry must be a table') } }
+           end
+
+    76     removals = removals or {}
+    76     additions = additions or {}
+
+    76     local items = deepCopy(itemsClone)
+    76     local errors = {}
+
+   118     for i, removal in ipairs(removals) do
+    42         if type(removal) ~= 'table' then
+     2             errors[#errors + 1] = makeError('removals[' .. i .. ']', 'removal must be a table')
+               else
+    40             local result = applyRemoval(items, removal, constraints, itemRegistry, i)
+    40             if result ~= true then
+    24                 errors[#errors + 1] = result
+                   end
+               end
+           end
+
+           -- Only apply additions if every removal validated; otherwise the working
+           -- copy is in a partial state and addition errors would be misleading.
+    76     if #errors > 0 then
+    26         return { ok = false, errors = errors }
+           end
+
+    92     for i, addition in ipairs(additions) do
+    42         if type(addition) ~= 'table' then
+     2             errors[#errors + 1] = makeError('additions[' .. i .. ']', 'addition must be a table')
+               else
+    40             local result = applyAddition(items, addition, constraints, itemRegistry, i)
+    40             if result ~= true then
+    22                 errors[#errors + 1] = result
+                   end
+               end
+           end
+
+    50     if #errors > 0 then
+    24         return { ok = false, errors = errors }
+           end
+
+    26     return { ok = true, items = items }
+       end
+
+       -- Canonical serializer for a single value (used for metadata/info).
+       -- Maps are emitted with sorted string keys; arrays preserve insertion order.
+       local function canonicalizeValue(value)
+   104     if value == nil then
+*****0         return 'null'
+   104     elseif type(value) == 'boolean' then
+     8         return value and 'true' or 'false'
+    96     elseif type(value) == 'number' then
+    44         return tostring(value)
+    52     elseif type(value) == 'string' then
+     8         return '"' .. value:gsub('\\', '\\\\'):gsub('"', '\\"') .. '"'
+    44     elseif type(value) == 'table' then
+               -- Detect array: contiguous integer keys 1..n with no non-integer keys.
+    44         local n = 0
+   104         for k in pairs(value) do
+    60             n = n + 1
+               end
+    44         local isArray = true
+    68         for k in pairs(value) do
+    60             if type(k) ~= 'number' or math.floor(k) ~= k or k < 1 or k > n then
+    36                 isArray = false
+    36                 break
+                   end
+               end
+
+    44         if isArray and n > 0 then
+     8             local parts = {}
+    32             for i = 1, n do
+    24                 parts[i] = canonicalizeValue(value[i])
+                   end
+     8             return '[' .. table.concat(parts, ',') .. ']'
+               else
+    36             local keys = {}
+    72             for k in pairs(value) do
+    36                 keys[#keys + 1] = tostring(k)
+                   end
+    36             table.sort(keys)
+    36             local parts = {}
+    72             for _, k in ipairs(keys) do
+    36                 parts[#parts + 1] = '"' .. k .. '":' .. canonicalizeValue(value[k])
+                   end
+    36             return '{' .. table.concat(parts, ',') .. '}'
+               end
+           end
+*****0     return 'null'
+       end
+
+       local function canonicalEntry(op, descriptor)
+    80     local item = descriptor.item or ''
+    80     local amount = tostring(descriptor.amount or '')
+    80     local slot = descriptor.slot ~= nil and tostring(descriptor.slot) or ''
+    80     local meta = descriptor.metadata ~= nil and canonicalizeValue(descriptor.metadata) or ''
+    80     if op == 'A' then
+    42         meta = descriptor.info ~= nil and canonicalizeValue(descriptor.info) or ''
+           end
+    80     return op .. ':' .. item .. ',' .. amount .. ',' .. slot .. ',' .. meta
+       end
+
+       -- Deterministic string used as the SHA2 input. The identifier and the
+       -- removals/additions arrays are emitted in fixed field order; array order is
+       -- preserved (a reordered batch is intentionally a different mutation).
+       -- @return string
+       local function canonicalPayload(identifier, removals, additions)
+    32     removals = removals or {}
+    32     additions = additions or {}
+    32     local parts = { 'id:' .. tostring(identifier or '') }
+    32     local rParts = {}
+    70     for i, removal in ipairs(removals) do
+    38         rParts[i] = canonicalEntry('R', removal)
+           end
+    32     parts[#parts + 1] = 'R:' .. table.concat(rParts, ';')
+    32     local aParts = {}
+    74     for i, addition in ipairs(additions) do
+    42         aParts[i] = canonicalEntry('A', addition)
+           end
+    32     parts[#parts + 1] = 'A:' .. table.concat(aParts, ';')
+    32     return table.concat(parts, '|')
+       end
+
+     4 QBInventoryBatch = {
+     4     validateBatch = validateBatch,
+     4     canonicalPayload = canonicalPayload,
+     4 }
+
+     4 return QBInventoryBatch
+
+==============================================================================
+Summary
+==============================================================================
+
+File                                                              Hits Missed Coverage
+--------------------------------------------------------------------------------------
+resources\[meus-scripts]\qb-czcraft\config\access.lua             28   0      100.00%
+resources\[meus-scripts]\qb-czcraft\config\general.lua            20   0      100.00%
+resources\[meus-scripts]\qb-czcraft\config\machines.lua           38   0      100.00%
+resources\[meus-scripts]\qb-czcraft\config\plots.lua              2    0      100.00%
+resources\[meus-scripts]\qb-czcraft\config\recipes.lua            211  0      100.00%
+resources\[meus-scripts]\qb-czcraft\server\domain\bills.lua       117  9      92.86%
+resources\[meus-scripts]\qb-czcraft\server\domain\catchup.lua     121  5      96.03%
+resources\[meus-scripts]\qb-czcraft\server\domain\machines.lua    175  13     93.09%
+resources\[meus-scripts]\qb-czcraft\server\domain\owners.lua      29   2      93.55%
+resources\[meus-scripts]\qb-czcraft\server\domain\permissions.lua 45   3      93.75%
+resources\[meus-scripts]\qb-czcraft\server\domain\production.lua  91   5      94.79%
+resources\[meus-scripts]\qb-czcraft\server\domain\scheduler.lua   74   0      100.00%
+resources\[meus-scripts]\qb-czcraft\server\schema_gate.lua        46   0      100.00%
+resources\[meus-scripts]\qb-czcraft\shared\constants.lua          37   0      100.00%
+resources\[meus-scripts]\qb-czcraft\shared\recipe_catalog.lua     33   3      91.67%
+resources\[meus-scripts]\qb-czcraft\shared\recipe_snapshot.lua    68   5      93.15%
+resources\[meus-scripts]\qb-czcraft\shared\validation.lua         226  69     76.61%
+resources\[qb]\qb-inventory\server\idempotent_batch.lua           209  4      98.12%
+--------------------------------------------------------------------------------------
+Total                                                             1570 118    93.01%
