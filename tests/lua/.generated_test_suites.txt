@@ -4,6 +4,7 @@ tests\lua\unit\qb-czcraft\catchup_spec.lua
 tests\lua\unit\qb-czcraft\config_validation_spec.lua
 tests\lua\unit\qb-czcraft\cycle_engine_spec.lua
 tests\lua\unit\qb-czcraft\cycles_repo_idempotency_spec.lua
+tests\lua\unit\qb-czcraft\finance_adapter_spec.lua
 tests\lua\unit\qb-czcraft\e2e_verdict_spec.lua
 tests\lua\unit\qb-czcraft\machine_lifecycle_spec.lua
 tests\lua\unit\qb-czcraft\permissions_spec.lua

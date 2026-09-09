@@ -396,6 +396,11 @@ QBCore.Shared.Items = {
     cz_components               = { name = 'cz_components', label = 'Components', weight = 300, type = 'item', image = 'metalscrap.png', unique = false, useable = false, shouldClose = false, description = 'Assembled industrial components' },
     cz_receiver                 = { name = 'cz_receiver', label = 'Receiver', weight = 500, type = 'item', image = 'metalscrap.png', unique = false, useable = false, shouldClose = false, description = 'Weapon receiver for assembly' },
 
+    -- qb-czcraft v0.2 consumables (maintenance, power, upgrades)
+    cz_maintenance_kit          = { name = 'cz_maintenance_kit', label = 'Maintenance Kit', weight = 500, type = 'item', image = 'metalscrap.png', unique = false, useable = false, shouldClose = false, description = 'Restores machine condition when applied via the machine NUI' },
+    cz_power_cell               = { name = 'cz_power_cell', label = 'Power Cell', weight = 300, type = 'item', image = 'metalscrap.png', unique = false, useable = false, shouldClose = false, description = 'Recharges machine power when inserted via the machine NUI' },
+    cz_upgrade_module           = { name = 'cz_upgrade_module', label = 'Upgrade Module', weight = 200, type = 'item', image = 'metalscrap.png', unique = false, useable = false, shouldClose = false, description = 'Consumed when upgrading a machine track' },
+
     -- qb-czcraft machines (unique=true, sold in hardware shops, placeholder images)
     cz_workbench_machine        = { name = 'cz_workbench_machine', label = 'Workbench', weight = 10000, type = 'item', image = 'workbench.png', unique = true, useable = true, shouldClose = false, description = 'Industrial workbench for basic automatic operations' },
     cz_refinery_machine         = { name = 'cz_refinery_machine', label = 'Refinery', weight = 20000, type = 'item', image = 'workbench.png', unique = true, useable = true, shouldClose = false, description = 'Industrial refinery for processing raw resources' },

@@ -1,15 +1,16 @@
 -- qb-czcraft general configuration
--- v0.1 foundation: all gameplay flags disabled, fixture caps as pre-gate defaults,
--- and required production overrides represented as explicit unresolved sentinels.
+-- v0.2: condition/wear/maintenance, power, upgrades, priority ordering,
+-- UNTIL_X, sale events, and financial exports are feature-gated so they
+-- can be deployed incrementally. All gameplay flags default to enabled
+-- for v0.2; disable individually for staged rollout.
 
 CZCraft.Config = CZCraft.Config or {}
 
 CZCraft.Config.General = {
     resourceName = 'qb-czcraft',
-    version = '0.1.0',
+    version = '0.2.0',
 
-    -- v0.1 feature flags. Every gameplay flag is disabled at scaffold time.
-    -- The resource loads and validates but registers no mutation surface.
+    -- Feature flags. v0.1 flags remain; v0.2 flags are added below.
     features = {
         placement = true,
         storageTransfers = false,
@@ -19,6 +20,15 @@ CZCraft.Config.General = {
         nui = true,
         repairkit = true,
         admin = false,
+        -- v0.2 feature flags
+        condition = true,
+        power = true,
+        upgrades = true,
+        priorityOrdering = true,
+        untilX = true,
+        sales = true,
+        financialExports = true,
+        rollups = true,
     },
 
     -- Fixture location caps are pre-gate test defaults explicitly called out by the spec.

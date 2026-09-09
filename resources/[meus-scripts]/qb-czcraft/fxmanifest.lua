@@ -3,8 +3,8 @@ game 'gta5'
 lua54 'yes'
 
 author 'Planta RP'
-description 'qb-czcraft — Dynamic Industry System (v0.1 foundation)'
-version '0.1.0'
+description 'qb-czcraft — Dynamic Industry System (v0.2 features)'
+version '0.2.0'
 
 dependencies {
     'qb-core',
@@ -29,6 +29,7 @@ shared_scripts {
     'config/access.lua',
     'config/plots.lua',
     'config/recipes.lua',
+    'config/balance.lua',
     'shared/recipe_catalog.lua',
     'shared/recipe_snapshot.lua',
     'shared/validation.lua',
@@ -42,6 +43,7 @@ server_scripts {
     'server/adapters/qb_core.lua',
     'server/adapters/qb_inventory.lua',
     'server/adapters/qb_houses.lua',
+    'server/adapters/finance.lua',
     'server/domain/owners.lua',
     'server/domain/permissions.lua',
     'server/domain/machines.lua',
@@ -56,6 +58,7 @@ server_scripts {
     'server/repositories/stock.lua',
     'server/repositories/bills.lua',
     'server/repositories/cycles.lua',
+    'server/repositories/finance.lua',
     'server/event_bus.lua',
     'server/api.lua',
     'server/nui_api.lua',

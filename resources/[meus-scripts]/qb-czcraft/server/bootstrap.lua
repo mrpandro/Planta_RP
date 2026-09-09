@@ -20,6 +20,7 @@ local function assembleConfig()
         Access = CZCraft.Config.Access,
         Plots = CZCraft.Config.Plots,
         Recipes = CZCraft.Config.Recipes,
+        Balance = CZCraft.Config.Balance,
     }
 end
 

@@ -137,19 +137,25 @@ end
 
 -- Completes a cycle: moves reserved output to actual stock, deletes the active
 -- cycle row, and inserts a production event. Idempotent: the production-event
--- INSERT uses ON DUPLICATE KEY UPDATE on the unique idempotency_key. When the
--- event already exists (replay), MySQL returns affected = 0 and ALL side
--- effects (stock deltas, cycle delete, machine update) are skipped — the
--- transaction commits as a no-op and the cached/prior result is returned.
--- This guard is in the repository, not the caller: side effects are gated on
--- the dedup-key write's affected count, not on caller discipline or column-type
--- side effects.
+-- INSERT IGNORE is the FIRST statement inside a MySQL.startTransaction
+-- callback. If the event already exists (replay or concurrent race),
+-- affectedRows = 0 and ALL side effects (stock deltas, cycle delete, machine
+-- update) are skipped — the transaction commits as a no-op.
+--
+-- This replaces the prior check-then-transaction pattern (preflight SELECT
+-- + MySQL.transaction.await) which had a replay race: two callers could
+-- both pass the preflight SELECT, then both execute the transaction and
+-- both apply stock deltas. The startTransaction callback gates side effects
+-- on the dedup-key write's affected count INSIDE the transaction, so the
+-- race window is closed at the database level.
+--
 -- @param params table {
 --   cycle_id, machine_uuid, bill_id?, completion_deltas = { { item_name, quantity_delta, reserved_delta } },
 --   idempotency_key, cycles_completed = 1, inputs_json, outputs_json, cost, started_at, ended_at,
 -- }
 -- @return boolean ok
 -- @return string|nil error
+-- @return boolean replayed (true if the event already existed — caller skips bill increment + next cycle)
 function CyclesRepo.complete(params)
     local endedAtIso = os.date('!%Y-%m-%d %H:%M:%S.000', params.ended_at)
     local startedAtIso = os.date('!%Y-%m-%d %H:%M:%S.000', params.started_at)
@@ -188,14 +194,14 @@ function CyclesRepo.complete(params)
         end
     end
 
-    -- Insert the production event (idempotent via unique idempotency_key).
+    -- Idempotent production-event INSERT. INSERT IGNORE gives affectedRows = 0
+    -- when the unique idempotency_key already exists (replay or concurrent race).
     local insertEventStatement = [[
-        INSERT INTO `czcraft_production_events`
+        INSERT IGNORE INTO `czcraft_production_events`
             (`event_id`, `machine_uuid`, `bill_id`, `cycles_completed`,
              `inputs`, `outputs`, `cost`, `started_at`, `ended_at`,
              `idempotency_key`, `status`)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'COMMITTED')
-        ON DUPLICATE KEY UPDATE `event_id` = `event_id`
     ]]
     local eventUuid = params.event_id or params.idempotency_key
     local insertEventArgs = {
@@ -225,40 +231,34 @@ function CyclesRepo.complete(params)
         WHERE `machine_uuid` = ?
     ]]
 
-    -- Idempotency check: if the production event already exists (replay),
-    -- the prior completion already applied all side effects. Return success
-    -- without re-applying. This replaces the function-based transaction's
-    -- eventAffected==0 gate, which oxmysql 2.14.1 does not support (it
-    -- requires a table of queries, not a function callback).
-    local existing = MySQL.single.await(
-        'SELECT `event_id` FROM `czcraft_production_events` WHERE `idempotency_key` = ?',
-        { params.idempotency_key }
-    )
-    if existing then
-        -- Replay: prior completion already applied stock deltas, deleted the
-        -- active cycle, and stopped the machine. Return cached/prior success.
-        return true, nil
-    end
+    local replayed = false
 
-    -- Build the transaction query list. The INSERT uses ON DUPLICATE KEY
-    -- UPDATE as a race-condition guard: if another process inserts the event
-    -- between the check above and this transaction, the INSERT becomes a
-    -- no-op (unique key hit). The stock deltas still run in that rare case,
-    -- but the event's idempotency_key prevents a second production event.
-    local queries = {
-        { query = insertEventStatement, values = insertEventArgs },
-    }
-    for i = 1, #deltaStatements do
-        queries[#queries + 1] = { query = deltaStatements[i], values = deltaArgs[i] }
-    end
-    queries[#queries + 1] = { query = deleteCycleStatement, values = { params.machine_uuid, params.cycle_id } }
-    queries[#queries + 1] = { query = updateMachineStatement, values = { params.machine_uuid } }
+    local ok = MySQL.startTransaction(function(tx)
+        -- Idempotency guard: INSERT IGNORE as the first statement.
+        -- affectedRows = 1 → new event, proceed with side effects.
+        -- affectedRows = 0 → replay or race, commit as no-op.
+        local result = tx(insertEventStatement, insertEventArgs)
+        local affectedRows = result and result.affectedRows or 0
+        if affectedRows == 0 then
+            replayed = true
+            return true
+        end
 
-    local ok, err = pcall(MySQL.transaction.await, queries)
+        -- New event inserted: apply all side effects inside the same
+        -- transaction. If any tx() call throws, the transaction rolls back
+        -- and the event INSERT is also rolled back (atomic).
+        for i = 1, #deltaStatements do
+            tx(deltaStatements[i], deltaArgs[i])
+        end
+        tx(deleteCycleStatement, { params.machine_uuid, params.cycle_id })
+        tx(updateMachineStatement, { params.machine_uuid })
+        return true
+    end)
+
     if not ok then
-        return false, tostring(err)
+        return false, 'complete transaction failed'
     end
-    return true, nil
+    return true, nil, replayed
 end
 
 -- Deletes the active cycle row without producing output (used on cycle failure/cancel).
@@ -303,9 +303,9 @@ end
 -- production event + machine next_due_at advance, all in ONE transaction.
 -- Catch-up cycles are instantly complete (no active-cycle row, no reservation
 -- dance): inputs are consumed and outputs produced directly. Idempotent via
--- the idempotency_key on czcraft_production_events — a replay (same chunk
--- sequence) commits as a no-op because the event INSERT hits the unique key
--- and returns affected = 0, which gates all side effects (same pattern as
+-- INSERT IGNORE on the idempotency_key as the first statement inside a
+-- MySQL.startTransaction callback — a replay (same chunk sequence) gives
+-- affectedRows = 0 and all side effects are skipped (same pattern as
 -- complete()).
 --
 -- @param params table {
@@ -317,10 +317,11 @@ end
 -- }
 -- @return boolean ok
 -- @return string|nil error
+-- @return boolean replayed (true if the chunk event already existed)
 function CyclesRepo.applyCatchUpChunk(params)
     local n = params.cycles_to_run
     if not n or n <= 0 then
-        return true, nil
+        return true, nil, false
     end
 
     local startedAtIso = os.date('!%Y-%m-%d %H:%M:%S.000', params.chunk_started_at)
@@ -365,17 +366,17 @@ function CyclesRepo.applyCatchUpChunk(params)
         end
     end
 
-    -- Aggregated production event (idempotent via unique idempotency_key).
+    -- Idempotent production-event INSERT. INSERT IGNORE gives affectedRows = 0
+    -- when the unique idempotency_key already exists (replay or concurrent race).
     local inputsJson = json.encode(recipe.inputs or {})
     local outputsJson = json.encode(recipe.outputs or {})
     local eventUuid = params.event_id or params.idempotency_key
     local insertEventStatement = [[
-        INSERT INTO `czcraft_production_events`
+        INSERT IGNORE INTO `czcraft_production_events`
             (`event_id`, `machine_uuid`, `bill_id`, `cycles_completed`,
              `inputs`, `outputs`, `cost`, `started_at`, `ended_at`,
              `idempotency_key`, `status`)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'COMMITTED')
-        ON DUPLICATE KEY UPDATE `event_id` = `event_id`
     ]]
     local insertEventArgs = {
         eventUuid, params.machine_uuid, params.bill_id, n,
@@ -394,37 +395,29 @@ function CyclesRepo.applyCatchUpChunk(params)
     ]]
     local updateMachineArgs = { nextDueIso, params.machine_uuid }
 
-    -- Idempotency check: if the production event already exists (replay),
-    -- the prior chunk already applied all side effects. Return success
-    -- without re-applying. Same pattern as complete(): oxmysql 2.14.1
-    -- requires a table of queries for transactions, not a function callback,
-    -- so we check idempotency before the transaction instead of gating
-    -- side effects on the INSERT's affected count inside it.
-    local existing = MySQL.single.await(
-        'SELECT `event_id` FROM `czcraft_production_events` WHERE `idempotency_key` = ?',
-        { params.idempotency_key }
-    )
-    if existing then
-        -- Replay: prior chunk already applied stock deltas and advanced the
-        -- machine cursor. Return cached/prior success.
-        return true, nil
-    end
+    local replayed = false
 
-    -- Build the transaction query list. The INSERT uses ON DUPLICATE KEY
-    -- UPDATE as a race-condition guard (same as complete()).
-    local queries = {
-        { query = insertEventStatement, values = insertEventArgs },
-    }
-    for i = 1, #deltaStatements do
-        queries[#queries + 1] = { query = deltaStatements[i], values = deltaArgs[i] }
-    end
-    queries[#queries + 1] = { query = updateMachineStatement, values = updateMachineArgs }
+    local ok = MySQL.startTransaction(function(tx)
+        -- Idempotency guard: INSERT IGNORE as the first statement.
+        local result = tx(insertEventStatement, insertEventArgs)
+        local affectedRows = result and result.affectedRows or 0
+        if affectedRows == 0 then
+            replayed = true
+            return true
+        end
 
-    local ok, err = pcall(MySQL.transaction.await, queries)
+        -- New event inserted: apply stock deltas + advance the cursor.
+        for i = 1, #deltaStatements do
+            tx(deltaStatements[i], deltaArgs[i])
+        end
+        tx(updateMachineStatement, updateMachineArgs)
+        return true
+    end)
+
     if not ok then
-        return false, tostring(err)
+        return false, 'catch-up chunk transaction failed'
     end
-    return true, nil
+    return true, nil, replayed
 end
 
 CZCraft.CyclesRepo = CyclesRepo

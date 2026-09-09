@@ -124,7 +124,7 @@ return {
         name = "queryFn receives the singleton select SQL",
         test = function()
             local capturedSql
-            local function captureFn(sql) capturedSql = sql; return 1 end
+            local function captureFn(sql) capturedSql = sql; return REQUIRED end
 
             local r = checkSchemaGate(captureFn, REQUIRED)
 

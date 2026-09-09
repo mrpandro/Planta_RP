@@ -292,7 +292,7 @@ local function completeActiveCycle(machineUuid, machineVersion, machineType, now
     local startedAt = parseIsoToUnix(cycle.started_at) or now
     local idempotencyKey = machineUuid .. ':' .. cycle.cycle_id .. ':complete'
 
-    local ok, err = CZCraft.CyclesRepo.complete({
+    local ok, err, replayed = CZCraft.CyclesRepo.complete({
         cycle_id = cycle.cycle_id,
         machine_uuid = machineUuid,
         bill_id = cycle.bill_id,
@@ -308,6 +308,12 @@ local function completeActiveCycle(machineUuid, machineVersion, machineType, now
     if not ok then
         -- Completion failed (tx error). Re-heap so the next tick retries.
         CZCraft.SchedulerTick.wake(machineUuid, now)
+        return
+    end
+
+    -- Replay: the prior completion already incremented the bill and started
+    -- the next cycle. Skip both to avoid double-increment / duplicate cycle.
+    if replayed then
         return
     end
 
@@ -428,7 +434,7 @@ local function runCatchUp(machineUuid, machineVersion, machineType, lastComplete
         local nextDue = chunkEnd
         local idempotencyKey = machineUuid .. ':catchup:' .. tostring(chunkSequence)
 
-        local ok, err = CZCraft.CyclesRepo.applyCatchUpChunk({
+        local ok, err, replayed = CZCraft.CyclesRepo.applyCatchUpChunk({
             machine_uuid = machineUuid,
             bill_id = bill.bill_id,
             recipe = recipe,
@@ -447,16 +453,21 @@ local function runCatchUp(machineUuid, machineVersion, machineType, lastComplete
             return
         end
 
-        -- Increment the bill's produced_quantity by batch * cycles.
-        local freshBill = CZCraft.BillsRepo.load(bill.bill_id)
-        if freshBill then
-            CZCraft.BillsRepo.incrementProduced(
-                bill.bill_id,
-                tonumber(freshBill.version) or 0,
-                batch * result.cyclesToRun,
-                freshBill.mode,
-                tonumber(freshBill.target_quantity) or 0
-            )
+        -- Replay: the prior chunk already incremented the bill and advanced
+        -- the cursor. Skip the bill increment but still advance the local
+        -- cursor so the loop continues from the right point.
+        if not replayed then
+            -- Increment the bill's produced_quantity by batch * cycles.
+            local freshBill = CZCraft.BillsRepo.load(bill.bill_id)
+            if freshBill then
+                CZCraft.BillsRepo.incrementProduced(
+                    bill.bill_id,
+                    tonumber(freshBill.version) or 0,
+                    batch * result.cyclesToRun,
+                    freshBill.mode,
+                    tonumber(freshBill.target_quantity) or 0
+                )
+            end
         end
 
         cursor = nextDue
