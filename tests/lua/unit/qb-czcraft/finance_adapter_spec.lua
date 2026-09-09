@@ -1,6 +1,16 @@
--- Tests for the FinanceAdapter idempotent money movement saga.
--- Mocks FinanceRepo (DB journal) and the qb-core/qb-banking exports to
--- verify the PENDING/COMMITTED flow, replay handling, and failure paths.
+-- Tests for the FinanceAdapter idempotent money movement saga with the
+-- bank_statements external commit point.
+--
+-- Verifies:
+--   - Fresh movement: INSERT PENDING → insert bank_statement → move money → markCommitted
+--   - Replay with COMMITTED: return cached result (no re-apply)
+--   - Replay with PENDING + statement exists: skip re-apply, mark COMMITTED
+--   - Replay with PENDING + no statement: re-apply (insert statement + move money)
+--   - DEBIT checks balance before inserting statement
+--   - Insufficient balance fails without inserting a statement
+--   - Zero amount is a no-op
+--   - qb-banking passes formatted reason (with export_key) to AddMoney/RemoveMoney
+--   - Invalid params rejected
 
 -- ---------------------------------------------------------------------------
 -- Mock state
@@ -11,14 +21,17 @@ local qbBankingState = {}
 
 local function resetState()
     repoState = {
-        beginResults = {},   -- queue of { isFresh, existing } for beginExport
-        committed = {},       -- export_ids that were marked COMMITTED
+        beginResults = {},
+        committed = {},
+        statementExistsResults = {},
+        insertedStatements = {},
+        checkStatementCalls = {},
     }
     qbCoreState = {
-        player = nil,         -- { money = { cash = N, bank = N }, saveCalls = 0, addCalls = {}, removeCalls = {} }
+        player = nil,
     }
     qbBankingState = {
-        accounts = {},        -- { [accountId] = balance }
+        accounts = {},
         addCalls = {},
         removeCalls = {},
     }
@@ -39,6 +52,20 @@ CZCraft.FinanceRepo = {
     markCommitted = function(exportId, resultJson)
         repoState.committed[#repoState.committed + 1] = { export_id = exportId, result = resultJson }
         return true
+    end,
+    checkStatementExists = function(exportKey)
+        repoState.checkStatementCalls[#repoState.checkStatementCalls + 1] = exportKey
+        if #repoState.statementExistsResults > 0 then
+            return table.remove(repoState.statementExistsResults, 1)
+        end
+        return false
+    end,
+    insertPlayerStatement = function(params)
+        repoState.insertedStatements[#repoState.insertedStatements + 1] = params
+        return true
+    end,
+    formatBankingReason = function(exportKey, humanReason)
+        return 'czcraft|' .. exportKey .. '|' .. humanReason
     end,
 }
 
@@ -77,17 +104,18 @@ exports = setmetatable({}, {
             }
         elseif name == 'qb-banking' then
             return {
-                AddAccountMoney = function(accountId, amount)
-                    qbBankingState.addCalls[#qbBankingState.addCalls + 1] = { account = accountId, amount = amount }
-                    qbBankingState.accounts[accountId] = (qbBankingState.accounts[accountId] or 0) + amount
+                AddMoney = function(accountName, amount, reason)
+                    qbBankingState.addCalls[#qbBankingState.addCalls + 1] = { account = accountName, amount = amount, reason = reason }
+                    qbBankingState.accounts[accountName] = (qbBankingState.accounts[accountName] or 0) + amount
                     return true
                 end,
-                RemoveAccountMoney = function(accountId, amount)
-                    local balance = qbBankingState.accounts[accountId] or 0
-                    if balance < amount then return false end
-                    qbBankingState.removeCalls[#qbBankingState.removeCalls + 1] = { account = accountId, amount = amount }
-                    qbBankingState.accounts[accountId] = balance - amount
+                RemoveMoney = function(accountName, amount, reason)
+                    qbBankingState.removeCalls[#qbBankingState.removeCalls + 1] = { account = accountName, amount = amount, reason = reason }
+                    qbBankingState.accounts[accountName] = (qbBankingState.accounts[accountName] or 0) - amount
                     return true
+                end,
+                GetAccountBalance = function(accountName)
+                    return qbBankingState.accounts[accountName] or 0
                 end,
             }
         end
@@ -138,7 +166,7 @@ end
 local tests = {}
 
 tests[#tests + 1] = {
-    name = "fresh DEBIT from qb-core bank removes money and saves",
+    name = "fresh DEBIT from qb-core: inserts statement BEFORE money moves, then saves",
     test = function()
         resetState()
         qbCoreState.player = makeMockPlayer({ cash = 1000, bank = 5000 })
@@ -147,6 +175,7 @@ tests[#tests + 1] = {
             export_key = "purchase:machine-1",
             source_type = CZCraft.FinancialSourceType.QB_CORE,
             source_id = 1,
+            citizenid = "ABC123",
             direction = CZCraft.FinancialDirection.DEBIT,
             amount = 500,
             account = 'bank',
@@ -155,17 +184,23 @@ tests[#tests + 1] = {
 
         assertTrue(result.success, "should succeed")
         assertFalse(result.replayed, "should not be a replay")
+        -- Statement inserted before money moved.
+        assertEqual(#repoState.insertedStatements, 1, "one bank_statement inserted")
+        assertEqual(repoState.insertedStatements[1].export_key, "purchase:machine-1", "statement has export_key")
+        assertEqual(repoState.insertedStatements[1].statement_type, 'withdraw', "DEBIT is a withdraw")
+        assertEqual(repoState.insertedStatements[1].amount, 500, "statement amount matches")
+        -- Money moved + saved.
         assertEqual(#qbCoreState.player.removeCalls, 1, "one RemoveMoney call")
         assertEqual(qbCoreState.player.removeCalls[1].amount, 500, "removed 500")
-        assertEqual(qbCoreState.player.removeCalls[1].account, 'bank', "from bank")
-        assertEqual(qbCoreState.player.saveCalls, 1, "Save called once for durability")
+        assertEqual(qbCoreState.player.saveCalls, 1, "Save called once")
         assertEqual(qbCoreState.player.PlayerData.money.bank, 4500, "balance reduced to 4500")
+        -- Export marked COMMITTED.
         assertEqual(#repoState.committed, 1, "export marked COMMITTED")
     end,
 }
 
 tests[#tests + 1] = {
-    name = "fresh CREDIT to qb-core cash adds money and saves",
+    name = "fresh CREDIT to qb-core: inserts statement BEFORE money moves, then saves",
     test = function()
         resetState()
         qbCoreState.player = makeMockPlayer({ cash = 100, bank = 0 })
@@ -174,6 +209,7 @@ tests[#tests + 1] = {
             export_key = "sale:machine-1:steel",
             source_type = CZCraft.FinancialSourceType.QB_CORE,
             source_id = 1,
+            citizenid = "ABC123",
             direction = CZCraft.FinancialDirection.CREDIT,
             amount = 250,
             account = 'cash',
@@ -181,9 +217,10 @@ tests[#tests + 1] = {
         })
 
         assertTrue(result.success, "should succeed")
+        assertEqual(#repoState.insertedStatements, 1, "one bank_statement inserted")
+        assertEqual(repoState.insertedStatements[1].statement_type, 'deposit', "CREDIT is a deposit")
         assertEqual(#qbCoreState.player.addCalls, 1, "one AddMoney call")
         assertEqual(qbCoreState.player.addCalls[1].amount, 250, "added 250")
-        assertEqual(qbCoreState.player.addCalls[1].account, 'cash', "to cash")
         assertEqual(qbCoreState.player.saveCalls, 1, "Save called once")
         assertEqual(qbCoreState.player.PlayerData.money.cash, 350, "balance increased to 350")
     end,
@@ -202,6 +239,7 @@ tests[#tests + 1] = {
             export_key = "purchase:machine-1",
             source_type = CZCraft.FinancialSourceType.QB_CORE,
             source_id = 1,
+            citizenid = "ABC123",
             direction = CZCraft.FinancialDirection.DEBIT,
             amount = 500,
             account = 'bank',
@@ -210,25 +248,61 @@ tests[#tests + 1] = {
 
         assertTrue(result.success, "should succeed (cached)")
         assertTrue(result.replayed, "should signal replay")
-        assertEqual(#qbCoreState.player.removeCalls, 0, "NO RemoveMoney on replay")
-        assertEqual(qbCoreState.player.saveCalls, 0, "NO Save on replay")
-        assertEqual(#repoState.committed, 0, "NO new COMMITTED on replay")
+        assertEqual(#qbCoreState.player.removeCalls, 0, "NO RemoveMoney on COMMITTED replay")
+        assertEqual(qbCoreState.player.saveCalls, 0, "NO Save on COMMITTED replay")
+        assertEqual(#repoState.insertedStatements, 0, "NO statement insert on COMMITTED replay")
+        assertEqual(#repoState.checkStatementCalls, 0, "NO statement check on COMMITTED replay (short-circuits)")
+        assertEqual(#repoState.committed, 0, "NO new COMMITTED on COMMITTED replay")
     end,
 }
 
 tests[#tests + 1] = {
-    name = "replay with PENDING status re-applies the movement",
+    name = "replay with PENDING + statement EXISTS: skips re-apply, marks COMMITTED (silent-loss acceptance)",
     test = function()
         resetState()
         qbCoreState.player = makeMockPlayer({ cash = 1000, bank = 5000 })
         repoState.beginResults = {
             { isFresh = false, existing = { export_id = "pending-id", status = 'PENDING', result = nil } },
         }
+        repoState.statementExistsResults = { true }
 
         local result = FinanceAdapter.applyMovement({
             export_key = "purchase:machine-1",
             source_type = CZCraft.FinancialSourceType.QB_CORE,
             source_id = 1,
+            citizenid = "ABC123",
+            direction = CZCraft.FinancialDirection.DEBIT,
+            amount = 500,
+            account = 'bank',
+            reason = 'machine purchase',
+        })
+
+        assertTrue(result.success, "should succeed (statement exists → assume money was applied)")
+        assertTrue(result.replayed, "should signal replay")
+        assertTrue(result.result.replayedFromStatement, "result should flag replayedFromStatement")
+        assertEqual(#repoState.checkStatementCalls, 1, "one statement check on PENDING replay")
+        assertEqual(#qbCoreState.player.removeCalls, 0, "NO RemoveMoney when statement exists")
+        assertEqual(qbCoreState.player.saveCalls, 0, "NO Save when statement exists")
+        assertEqual(#repoState.insertedStatements, 0, "NO new statement insert when statement exists")
+        assertEqual(#repoState.committed, 1, "marked COMMITTED after skip")
+    end,
+}
+
+tests[#tests + 1] = {
+    name = "replay with PENDING + NO statement: re-applies (inserts statement + moves money)",
+    test = function()
+        resetState()
+        qbCoreState.player = makeMockPlayer({ cash = 1000, bank = 5000 })
+        repoState.beginResults = {
+            { isFresh = false, existing = { export_id = "pending-id", status = 'PENDING', result = nil } },
+        }
+        repoState.statementExistsResults = { false }
+
+        local result = FinanceAdapter.applyMovement({
+            export_key = "purchase:machine-1",
+            source_type = CZCraft.FinancialSourceType.QB_CORE,
+            source_id = 1,
+            citizenid = "ABC123",
             direction = CZCraft.FinancialDirection.DEBIT,
             amount = 500,
             account = 'bank',
@@ -236,7 +310,9 @@ tests[#tests + 1] = {
         })
 
         assertTrue(result.success, "should succeed (re-applied)")
-        assertFalse(result.replayed, "PENDING re-apply is not a replay")
+        assertFalse(result.replayed, "PENDING-without-statement re-apply is not a replay")
+        assertEqual(#repoState.checkStatementCalls, 1, "one statement check")
+        assertEqual(#repoState.insertedStatements, 1, "statement inserted on re-apply")
         assertEqual(#qbCoreState.player.removeCalls, 1, "RemoveMoney re-applied")
         assertEqual(qbCoreState.player.saveCalls, 1, "Save re-applied")
         assertEqual(#repoState.committed, 1, "marked COMMITTED after re-apply")
@@ -244,7 +320,7 @@ tests[#tests + 1] = {
 }
 
 tests[#tests + 1] = {
-    name = "insufficient balance returns failure and marks COMMITTED with error",
+    name = "insufficient balance on DEBIT fails WITHOUT inserting a statement",
     test = function()
         resetState()
         qbCoreState.player = makeMockPlayer({ cash = 100, bank = 100 })
@@ -253,6 +329,7 @@ tests[#tests + 1] = {
             export_key = "purchase:expensive",
             source_type = CZCraft.FinancialSourceType.QB_CORE,
             source_id = 1,
+            citizenid = "ABC123",
             direction = CZCraft.FinancialDirection.DEBIT,
             amount = 500,
             account = 'bank',
@@ -262,13 +339,14 @@ tests[#tests + 1] = {
         assertFalse(result.success, "should fail")
         assertTrue(result.reason and string.find(result.reason, 'insufficient'),
             "reason should mention insufficient balance")
+        assertEqual(#repoState.insertedStatements, 0, "NO statement inserted on insufficient balance")
         assertEqual(#qbCoreState.player.removeCalls, 0, "NO RemoveMoney on insufficient balance")
         assertEqual(#repoState.committed, 1, "export marked COMMITTED with failure result")
     end,
 }
 
 tests[#tests + 1] = {
-    name = "zero amount is a no-op success without touching the journal",
+    name = "zero amount is a no-op success without touching the journal or statements",
     test = function()
         resetState()
         qbCoreState.player = makeMockPlayer({ cash = 1000, bank = 5000 })
@@ -277,6 +355,7 @@ tests[#tests + 1] = {
             export_key = "zero-op",
             source_type = CZCraft.FinancialSourceType.QB_CORE,
             source_id = 1,
+            citizenid = "ABC123",
             direction = CZCraft.FinancialDirection.CREDIT,
             amount = 0,
             account = 'cash',
@@ -286,12 +365,13 @@ tests[#tests + 1] = {
         assertTrue(result.success, "should succeed")
         assertFalse(result.replayed, "not a replay")
         assertEqual(#qbCoreState.player.addCalls, 0, "NO AddMoney for zero amount")
+        assertEqual(#repoState.insertedStatements, 0, "NO statement for zero amount")
         assertEqual(#repoState.committed, 0, "NO journal entry for zero amount")
     end,
 }
 
 tests[#tests + 1] = {
-    name = "qb-banking CREDIT adds to the bank account",
+    name = "qb-banking CREDIT: passes formatted reason (with export_key) to AddMoney",
     test = function()
         resetState()
         qbBankingState.accounts = { ['gang-1'] = 10000 }
@@ -307,13 +387,17 @@ tests[#tests + 1] = {
         })
 
         assertTrue(result.success, "should succeed")
-        assertEqual(#qbBankingState.addCalls, 1, "one AddAccountMoney call")
-        assertEqual(qbBankingState.accounts['gang-1'], 10500, "account balance increased")
+        assertEqual(#qbBankingState.addCalls, 1, "one AddMoney call")
+        assertEqual(qbBankingState.addCalls[1].account, 'gang-1', "to gang-1 account")
+        assertEqual(qbBankingState.addCalls[1].amount, 500, "amount 500")
+        assertTrue(string.find(qbBankingState.addCalls[1].reason, 'sale:gang-1:parts', 1, true) ~= nil,
+            "reason contains export_key for idempotency guard")
+        assertEqual(#repoState.insertedStatements, 0, "NO separate statement insert for qb-banking (AddMoney creates one)")
     end,
 }
 
 tests[#tests + 1] = {
-    name = "qb-banking DEBIT with insufficient balance fails",
+    name = "qb-banking DEBIT with insufficient balance fails without moving money",
     test = function()
         resetState()
         qbBankingState.accounts = { ['gang-1'] = 100 }
@@ -329,7 +413,7 @@ tests[#tests + 1] = {
         })
 
         assertFalse(result.success, "should fail")
-        assertEqual(#qbBankingState.removeCalls, 0, "NO RemoveAccountMoney on insufficient")
+        assertEqual(#qbBankingState.removeCalls, 0, "NO RemoveMoney on insufficient")
         assertEqual(qbBankingState.accounts['gang-1'], 100, "balance unchanged")
     end,
 }

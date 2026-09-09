@@ -1,24 +1,40 @@
 -- qb-czcraft financial export adapter
 -- Idempotent money movements to qb-core (player cash/bank) and qb-banking
--- (bank accounts). Every movement is journaled in czcraft_financial_exports
--- so a replay (same export_key) does not double-apply.
+-- (job/gang accounts). Every movement is journaled in czcraft_financial_exports
+-- AND marked in bank_statements so a replay (same export_key) does not
+-- double-apply.
 --
--- Two source types:
---   qb-core:    Player.Functions.AddMoney / RemoveMoney (in-memory + save)
---   qb-banking: exports['qb-banking']:... bank account transfer
+-- Two-phase PENDING/COMMITTED with an external commit point:
 --
--- The PENDING/COMMITTED flow:
---   1. FinanceRepo.beginExport — INSERT IGNORE; affectedRows=0 = replay.
---   2. If replay + COMMITTED → return cached result (no re-apply).
---   3. If replay + PENDING → prior attempt incomplete; re-apply.
---   4. If fresh → apply the money movement via the source adapter.
---   5. FinanceRepo.markCommitted — record the outcome.
+--   Player personal accounts (qb-core):
+--     1. INSERT IGNORE PENDING to czcraft_financial_exports
+--     2. INSERT bank_statements row with export_key in reason (BEFORE money moves)
+--     3. Player.Functions.AddMoney/RemoveMoney (in-memory) + Save() (persist)
+--     4. markCommitted
 --
--- qb-core money methods mutate memory without immediate persistence; the
--- adapter calls Player.Functions.Save() after a successful movement so the
--- balance change is durable before the export is marked COMMITTED. This
--- closes the window where a crash after AddMoney but before Save would lose
--- the balance change while the export says COMMITTED.
+--   Job/gang accounts (qb-banking):
+--     1. INSERT IGNORE PENDING to czcraft_financial_exports
+--     2. qb-banking AddMoney/RemoveMoney (inserts its own bank_statements row
+--        with export_key in reason, then updates balance)
+--     3. markCommitted
+--
+-- On PENDING replay:
+--   - Query bank_statements for the export_key.
+--   - If found → money movement was initiated → skip re-apply, mark COMMITTED.
+--   - If not found → money movement was never initiated → re-apply.
+--
+-- Residual gap (player accounts): between step 2 (statement insert) and
+-- step 3 (Save). A crash there leaves a statement but no persisted balance
+-- change → replay skips → silent loss. This is the safer failure mode:
+-- the player loses money but cannot duplicate it. The window is one INSERT
+-- to one Save call. This cannot be eliminated without qb-core supporting
+-- idempotency keys on AddMoney/RemoveMoney.
+--
+-- This is NOT the same gap as the inventory batch. The inventory batch
+-- closes its gap because czcraft owns the persistence layer end-to-end
+-- (its own DB, its own transaction, FOR UPDATE on its own mutation row).
+-- Money is structurally different: Player:Save() writes into qb-core's
+-- own persistence path, outside our transaction boundary.
 
 CZCraft = CZCraft or {}
 
@@ -65,30 +81,37 @@ local function applyQbCoreMovement(source, direction, amount, account)
     return true, nil
 end
 
--- Applies a money movement to a qb-banking bank account.
+-- Applies a money movement to a qb-banking job/gang account.
+-- The reason parameter carries the export_key so the bank_statements row
+-- serves as the idempotency guard.
 -- @param sourceId string bank account identifier
 -- @param direction string 'DEBIT' | 'CREDIT'
 -- @param amount number
+-- @param bankingReason string (formatted with export_key)
 -- @return boolean ok
 -- @return string|nil error
-local function applyQbBankingMovement(sourceId, direction, amount)
-    -- qb-banking exposes a server-side export for account balance changes.
-    -- The export name and signature may vary by qb-banking version; this
-    -- adapter calls the documented AddAccountMoney / RemoveAccountMoney.
+local function applyQbBankingMovement(sourceId, direction, amount, bankingReason)
     local banking = exports['qb-banking']
     if not banking then
         return false, 'qb-banking export not found'
     end
 
     if direction == CZCraft.FinancialDirection.CREDIT then
-        local ok = banking.AddAccountMoney(sourceId, amount)
+        local ok = banking.AddMoney(sourceId, amount, bankingReason)
         if not ok then
-            return false, 'qb-banking AddAccountMoney failed'
+            return false, 'qb-banking AddMoney failed (account not found)'
         end
     elseif direction == CZCraft.FinancialDirection.DEBIT then
-        local ok = banking.RemoveAccountMoney(sourceId, amount)
+        -- qb-banking's RemoveMoney does NOT check for sufficient balance
+        -- (it permits account underflow). Check first to prevent negative
+        -- balances.
+        local balance = banking.GetAccountBalance(sourceId)
+        if not balance or balance < amount then
+            return false, 'insufficient account balance'
+        end
+        local ok = banking.RemoveMoney(sourceId, amount, bankingReason)
         if not ok then
-            return false, 'qb-banking RemoveAccountMoney failed (insufficient balance or account not found)'
+            return false, 'qb-banking RemoveMoney failed (account not found)'
         end
     else
         return false, 'unknown direction: ' .. tostring(direction)
@@ -98,8 +121,8 @@ local function applyQbBankingMovement(sourceId, direction, amount)
 end
 
 -- Executes an idempotent financial movement. The export_key prevents
--- double-application on replay. Returns the outcome so callers can decide
--- whether to proceed (e.g., skip a purchase if the debit failed).
+-- double-application on replay. The bank_statements row serves as the
+-- external commit point for PENDING replay resolution.
 --
 -- @param params table {
 --   export_key string (idempotency key — caller builds deterministically),
@@ -108,9 +131,10 @@ end
 --   direction string 'DEBIT' | 'CREDIT',
 --   amount number (>= 0),
 --   account string 'cash' | 'bank' (qb-core only; ignored for qb-banking),
---   reason string,
+--   reason string (human-readable, stored in journal + bank_statements),
 --   machine_uuid? string,
 --   bill_id? string,
+--   citizenid? string (required for qb-core player statements),
 -- }
 -- @return table { success, replayed?, reason?, result? }
 function FinanceAdapter.applyMovement(params)
@@ -137,6 +161,8 @@ function FinanceAdapter.applyMovement(params)
     end
 
     local exportId = generateUuid()
+    local humanReason = params.reason or 'czcraft'
+    local isPlayerAccount = params.source_type == CZCraft.FinancialSourceType.QB_CORE
 
     -- Step 1: record the intent (INSERT IGNORE for idempotency).
     local beginOk, isFresh, existing = CZCraft.FinanceRepo.beginExport({
@@ -147,7 +173,7 @@ function FinanceAdapter.applyMovement(params)
         direction = params.direction,
         amount = amount,
         account = params.account or 'bank',
-        reason = params.reason or 'czcraft',
+        reason = humanReason,
         machine_uuid = params.machine_uuid,
         bill_id = params.bill_id,
     })
@@ -158,26 +184,99 @@ function FinanceAdapter.applyMovement(params)
 
     -- Step 2: replay handling.
     if not isFresh then
-        -- The export_key already exists. If COMMITTED, return the cached
-        -- result. If PENDING, the prior attempt did not complete — re-apply.
+        -- The export_key already exists.
         if existing and existing.status == 'COMMITTED' then
+            -- Prior attempt completed. Return the cached result.
             local cachedResult = existing.result and json.decode(existing.result) or nil
             return { success = true, replayed = true, result = cachedResult }
         end
-        -- PENDING: use the existing export_id so markCommitted updates the
-        -- correct row.
+
+        -- PENDING: the prior attempt did not complete. Check the external
+        -- commit point (bank_statements) to determine whether the money
+        -- movement was initiated.
         exportId = existing and existing.export_id or exportId
+
+        local statementExists = CZCraft.FinanceRepo.checkStatementExists(params.export_key)
+        if statementExists then
+            -- The money movement was initiated (statement was inserted before
+            -- the money moved). Skip re-apply and mark COMMITTED. If a crash
+            -- happened between the statement insert and Save(), the money was
+            -- never persisted — this is silent loss, not double-grant.
+            local resultMeta = {
+                appliedAt = os.time(),
+                sourceType = params.source_type,
+                direction = params.direction,
+                amount = amount,
+                success = true,
+                replayedFromStatement = true,
+            }
+            CZCraft.FinanceRepo.markCommitted(exportId, json.encode(resultMeta))
+            return { success = true, replayed = true, result = resultMeta }
+        end
+
+        -- The statement was NOT found — the money movement was never
+        -- initiated. Fall through to re-apply (insert statement + move money).
     end
 
-    -- Step 3: apply the money movement.
+    -- Step 3 (fresh or PENDING-without-statement): apply the money movement.
+
+    -- For DEBIT, check balance before inserting the statement.
+    if params.direction == CZCraft.FinancialDirection.DEBIT then
+        if isPlayerAccount then
+            local Player = exports['qb-core']:GetPlayer(params.source_id)
+            if not Player then
+                local failMeta = { success = false, error = 'player not found' }
+                CZCraft.FinanceRepo.markCommitted(exportId, json.encode(failMeta))
+                return { success = false, reason = 'player not found', result = failMeta }
+            end
+            local balance = Player.PlayerData.money[params.account or 'bank'] or 0
+            if balance < amount then
+                local failMeta = { success = false, error = 'insufficient balance' }
+                CZCraft.FinanceRepo.markCommitted(exportId, json.encode(failMeta))
+                return { success = false, reason = 'insufficient ' .. (params.account or 'bank') .. ' balance', result = failMeta }
+            end
+        else
+            local banking = exports['qb-banking']
+            local balance = banking and banking.GetAccountBalance(params.source_id) or 0
+            if balance < amount then
+                local failMeta = { success = false, error = 'insufficient account balance' }
+                CZCraft.FinanceRepo.markCommitted(exportId, json.encode(failMeta))
+                return { success = false, reason = 'insufficient account balance', result = failMeta }
+            end
+        end
+    end
+
+    -- Insert the external commit point (bank_statements) BEFORE the money
+    -- moves. For player accounts, we insert directly. For job/gang accounts,
+    -- qb-banking's AddMoney/RemoveMoney inserts the statement as part of
+    -- the money movement, so we pass the formatted reason there instead.
+    if isPlayerAccount then
+        local stmtType = (params.direction == CZCraft.FinancialDirection.CREDIT) and 'deposit' or 'withdraw'
+        local stmtOk = CZCraft.FinanceRepo.insertPlayerStatement({
+            citizenid = params.citizenid,
+            account_name = params.account or 'checking',
+            amount = amount,
+            export_key = params.export_key,
+            human_reason = humanReason,
+            statement_type = stmtType,
+        })
+        if not stmtOk then
+            local failMeta = { success = false, error = 'failed to insert bank statement' }
+            CZCraft.FinanceRepo.markCommitted(exportId, json.encode(failMeta))
+            return { success = false, reason = 'failed to insert bank statement', result = failMeta }
+        end
+    end
+
+    -- Apply the money movement.
     local applyOk, applyErr
-    if params.source_type == CZCraft.FinancialSourceType.QB_CORE then
+    if isPlayerAccount then
         applyOk, applyErr = applyQbCoreMovement(
             params.source_id, params.direction, amount, params.account or 'bank'
         )
     else
+        local bankingReason = CZCraft.FinanceRepo.formatBankingReason(params.export_key, humanReason)
         applyOk, applyErr = applyQbBankingMovement(
-            params.source_id, params.direction, amount
+            params.source_id, params.direction, amount, bankingReason
         )
     end
 
@@ -189,10 +288,8 @@ function FinanceAdapter.applyMovement(params)
     }
 
     if not applyOk then
-        -- The money movement failed. Mark the export as COMMITTED with the
-        -- failure result so a replay does not retry indefinitely (the caller
-        -- can inspect the result to see the failure reason). The caller
-        -- treats this as a failed movement.
+        -- The money movement failed. Mark COMMITTED with the failure result
+        -- so a replay does not retry indefinitely.
         resultMeta.success = false
         resultMeta.error = applyErr
         CZCraft.FinanceRepo.markCommitted(exportId, json.encode(resultMeta))
