@@ -79,6 +79,7 @@ local function runAll()
                     allPass = false
                 else
                     results[name] = runErr
+                    if not runErr then allPass = false end
                 end
             end
         end

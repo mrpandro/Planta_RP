@@ -90,6 +90,7 @@ resources\[meus-scripts]\qb-czcraft\server\adapters\qb_houses.lua
 resources\[meus-scripts]\qb-czcraft\server\adapters\qb_inventory.lua
 resources\[meus-scripts]\qb-czcraft\server\api.lua
 resources\[meus-scripts]\qb-czcraft\server\bootstrap.lua
+resources\[meus-scripts]\qb-czcraft\server\cycle_engine.lua
 resources\[meus-scripts]\qb-czcraft\server\domain\bills.lua
 resources\[meus-scripts]\qb-czcraft\server\domain\catchup.lua
 resources\[meus-scripts]\qb-czcraft\server\domain\machines.lua
@@ -98,6 +99,7 @@ resources\[meus-scripts]\qb-czcraft\server\domain\permissions.lua
 resources\[meus-scripts]\qb-czcraft\server\domain\production.lua
 resources\[meus-scripts]\qb-czcraft\server\domain\scheduler.lua
 resources\[meus-scripts]\qb-czcraft\server\domain\storage.lua
+resources\[meus-scripts]\qb-czcraft\server\e2e_run.lua
 resources\[meus-scripts]\qb-czcraft\server\event_bus.lua
 resources\[meus-scripts]\qb-czcraft\server\nui_api.lua
 resources\[meus-scripts]\qb-czcraft\server\repairkit.lua
@@ -113,6 +115,15 @@ resources\[meus-scripts]\qb-czcraft\shared\constants.lua
 resources\[meus-scripts]\qb-czcraft\shared\recipe_catalog.lua
 resources\[meus-scripts]\qb-czcraft\shared\recipe_snapshot.lua
 resources\[meus-scripts]\qb-czcraft\shared\validation.lua
+resources\[meus-scripts]\qb-czcraft-e2e\fxmanifest.lua
+resources\[meus-scripts]\qb-czcraft-e2e\server\runner.lua
+resources\[meus-scripts]\qb-czcraft-e2e\server\scenarios\concurrent.lua
+resources\[meus-scripts]\qb-czcraft-e2e\server\scenarios\downtime_catchup.lua
+resources\[meus-scripts]\qb-czcraft-e2e\server\scenarios\failure_injection.lua
+resources\[meus-scripts]\qb-czcraft-e2e\server\scenarios\load_test.lua
+resources\[meus-scripts]\qb-czcraft-e2e\server\scenarios\production_chain.lua
+resources\[meus-scripts]\qb-czcraft-e2e\server\scenarios\repair_natives.lua
+resources\[meus-scripts]\qb-czcraft-e2e\server\slo.lua
 resources\[meus-scripts]\simple-repair\client.lua
 resources\[meus-scripts]\simple-repair\fxmanifest.lua
 resources\[meus-scripts]\simple-repair\server.lua
@@ -324,6 +335,7 @@ resources\[qb]\qb-cityhall\locales\pt-br.lua
 resources\[qb]\qb-cityhall\locales\tr.lua
 resources\[qb]\qb-cityhall\locales\vn.lua
 resources\[qb]\qb-cityhall\server.lua
+resources\[qb]\qb-clothing\fxmanifest.lua
 resources\[qb]\qb-core\client\drawtext.lua
 resources\[qb]\qb-core\client\events.lua
 resources\[qb]\qb-core\client\functions.lua

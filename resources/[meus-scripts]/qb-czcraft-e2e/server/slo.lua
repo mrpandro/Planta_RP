@@ -6,6 +6,44 @@ CZE2E = CZE2E or {}
 
 local Slo = {}
 
+-- Monotonic counter for unique ID generation. Combined with os.time and
+-- a process-local sequence, this guarantees uniqueness across repeated
+-- runs without relying on math.random (which caused bill-ID collisions
+-- on repeated runs — Duplicate entry on czcraft_bills.PRIMARY).
+local _uidCounter = 0
+
+-- Generates a unique ID with the given prefix. Format:
+--   <prefix>-<unix_time_ms>-<counter>
+-- The counter is monotonic within the process, and os.time changes
+-- between runs, so IDs are unique across runs without math.random.
+function Slo.uniqueId(prefix)
+    _uidCounter = _uidCounter + 1
+    return string.format('%s-%d-%d', prefix, os.time(), _uidCounter)
+end
+
+-- Cleans up all e2e-prefixed rows from the database. Called before each
+-- full run to ensure a clean state. The harness previously did not clean
+-- up its own rows (README-documented manual cleanup), causing dirty-state
+-- flapping: clean run -> PASS, immediate re-run -> FAIL (duplicate bill IDs,
+-- stale machine rows).
+function Slo.cleanup()
+    if not MySQL then return end
+    -- Order matters: child tables before parent tables to avoid FK issues.
+    -- production_events -> active_cycles -> machine_stock -> bills -> machines
+    local tables = {
+        { table = 'czcraft_production_events', column = 'machine_uuid', pattern = '%%e2e-%%' },
+        { table = 'czcraft_active_cycles',     column = 'machine_uuid', pattern = '%%e2e-%%' },
+        { table = 'czcraft_machine_stock',     column = 'machine_uuid', pattern = '%%e2e-%%' },
+        { table = 'czcraft_bills',             column = 'bill_id',      pattern = 'e2e-%%' },
+        { table = 'czcraft_machines',           column = 'location_id',  pattern = 'e2e-%%' },
+    }
+    for _, t in ipairs(tables) do
+        local sql = string.format('DELETE FROM `%s` WHERE `%s` LIKE ?', t.table, t.column)
+        pcall(MySQL.update.await, MySQL.update, sql, { t.pattern })
+    end
+    print('[E2E][cleanup] e2e-prefixed rows deleted from all czcraft tables')
+end
+
 -- High-resolution monotonic timer in milliseconds. Uses GetGameTimer (ms,
 -- monotonic since server start) on FiveM; falls back to os.clock in tests.
 local function nowMs()

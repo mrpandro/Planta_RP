@@ -137,7 +137,7 @@ local function runStage(label, machineType, recipeId, inputs, expectedOutput, ex
         end)()))
 
     -- Create the bill.
-    local billId = 'e2e-' .. recipeId .. '-' .. tostring(math.random(100000, 999999))
+    local billId = Slo.uniqueId('e2e-' .. recipeId)
     local ok, err = CZCraft.BillsRepo.create({
         bill_id = billId,
         machine_uuid = uuid,

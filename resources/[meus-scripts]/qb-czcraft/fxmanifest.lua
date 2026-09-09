@@ -62,6 +62,8 @@ server_scripts {
     'server/repairkit.lua',
     'server/cycle_engine.lua',
     'server/scheduler_tick.lua',
+    -- Usable items must be registered before the E2E runner loads.
+    'server/usable_items.lua',
     -- E2E runner must be last so it has access to all CZCraft globals.
     'server/e2e_run.lua',
 }

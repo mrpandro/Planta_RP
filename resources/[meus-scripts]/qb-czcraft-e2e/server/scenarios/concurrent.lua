@@ -12,6 +12,8 @@
 
 CZE2E = CZE2E or {}
 
+local Slo = CZE2E.Slo
+
 local function runConcurrent()
     print('[E2E] === concurrent: start ===')
     if not CZCraft.Runtime or not CZCraft.Runtime.isReady then
@@ -43,7 +45,7 @@ local function runConcurrent()
     CZCraft.StockRepo.upsert({ machine_uuid = uuid1, item_name = 'iron', quantity = 5, reserved_quantity = 0, standard_unit_cost = 0 })
     CZCraft.StockRepo.upsert({ machine_uuid = uuid1, item_name = 'metalscrap', quantity = 2, reserved_quantity = 0, standard_unit_cost = 0 })
 
-    local billId1 = 'e2e-conc-1-' .. tostring(math.random(100000, 999999))
+    local billId1 = Slo.uniqueId('e2e-conc-1')
     CZCraft.BillsRepo.create({
         bill_id = billId1, machine_uuid = uuid1, recipe_id = 'smelt_steel',
         mode = 'PRODUCE_X', primary_output = 'steel', target_quantity = 2,
@@ -116,7 +118,7 @@ local function runConcurrent()
     -- Machine 2: smelt_steel (iron+metalscrap -> steel)
     CZCraft.StockRepo.upsert({ machine_uuid = uuid2, item_name = 'iron', quantity = 5, reserved_quantity = 0, standard_unit_cost = 0 })
     CZCraft.StockRepo.upsert({ machine_uuid = uuid2, item_name = 'metalscrap', quantity = 2, reserved_quantity = 0, standard_unit_cost = 0 })
-    local billId2 = 'e2e-conc-2-' .. tostring(math.random(100000, 999999))
+    local billId2 = Slo.uniqueId('e2e-conc-2')
     CZCraft.BillsRepo.create({
         bill_id = billId2, machine_uuid = uuid2, recipe_id = 'smelt_steel',
         mode = 'PRODUCE_X', primary_output = 'steel', target_quantity = 2,
@@ -125,7 +127,7 @@ local function runConcurrent()
 
     -- Machine 3: make_metal_parts (steel -> cz_metal_parts)
     CZCraft.StockRepo.upsert({ machine_uuid = uuid3, item_name = 'steel', quantity = 4, reserved_quantity = 0, standard_unit_cost = 0 })
-    local billId3 = 'e2e-conc-3-' .. tostring(math.random(100000, 999999))
+    local billId3 = Slo.uniqueId('e2e-conc-3')
     CZCraft.BillsRepo.create({
         bill_id = billId3, machine_uuid = uuid3, recipe_id = 'make_metal_parts',
         mode = 'PRODUCE_X', primary_output = 'cz_metal_parts', target_quantity = 4,

@@ -26,3 +26,7 @@ desktop.ini
 
 # Update backups
 .update-backup/
+
+# E2E harness file-based IPC (runtime command/output/status files,
+# created by qb-czcraft-e2e at the server data root)
+/e2e_ipc/

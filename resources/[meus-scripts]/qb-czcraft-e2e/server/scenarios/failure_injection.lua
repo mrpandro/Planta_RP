@@ -59,7 +59,7 @@ local function runFailureInjection()
     CZCraft.StockRepo.upsert({ machine_uuid = uuid, item_name = 'iron', quantity = 5, reserved_quantity = 0, standard_unit_cost = 0 })
     CZCraft.StockRepo.upsert({ machine_uuid = uuid, item_name = 'metalscrap', quantity = 2, reserved_quantity = 0, standard_unit_cost = 0 })
 
-    local billId = 'e2e-fail-1-' .. tostring(math.random(100000, 999999))
+    local billId = Slo.uniqueId('e2e-fail-1')
     CZCraft.BillsRepo.create({
         bill_id = billId, machine_uuid = uuid, recipe_id = 'smelt_steel',
         mode = 'PRODUCE_X', primary_output = 'steel', target_quantity = 2,
@@ -67,7 +67,7 @@ local function runFailureInjection()
     })
 
     -- Manually start a cycle (simulating a successful cycle start that then crashed).
-    local cycleId = 'e2e-fail-cycle-' .. tostring(math.random(100000, 999999))
+    local cycleId = Slo.uniqueId('e2e-fail-cycle')
     local now = os.time()
     local recipe = nil
     for _, r in ipairs(CZCraft.Config.Recipes) do if r.id == 'smelt_steel' then recipe = r break end end
@@ -170,7 +170,7 @@ local function runFailureInjection()
     })
     CZCraft.StockRepo.upsert({ machine_uuid = uuid2, item_name = 'iron', quantity = 10, reserved_quantity = 0, standard_unit_cost = 0 })
     CZCraft.StockRepo.upsert({ machine_uuid = uuid2, item_name = 'metalscrap', quantity = 4, reserved_quantity = 0, standard_unit_cost = 0 })
-    local billId2 = 'e2e-fail-2-' .. tostring(math.random(100000, 999999))
+    local billId2 = Slo.uniqueId('e2e-fail-2')
     CZCraft.BillsRepo.create({
         bill_id = billId2, machine_uuid = uuid2, recipe_id = 'smelt_steel',
         mode = 'PRODUCE_X', primary_output = 'steel', target_quantity = 4,

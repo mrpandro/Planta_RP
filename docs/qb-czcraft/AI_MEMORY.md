@@ -52,12 +52,18 @@ Persistent project facts for AI agents working on qb-czcraft.
 
 ## Test coverage (Lua)
 
-- 254 tests total (including 5 cycle_engine_spec tests added 2026-09-08).
+- 232 tests total (including 5 cycle_engine_spec + 8 e2e_verdict_spec +
+  10 unsigned_guard_spec tests added 2026-09-08/09).
 - Cycle engine tests use a mock repo layer (in-memory state) since the
   orchestrator integrates pure domain + repos + FiveM globals.
 - The `cycle_engine_spec.lua` stubs `CreateThread` (synchronous), `Wait`,
   `RegisterNetEvent`, `AddEventHandler`, and `os.time` (fixed clock) for
   deterministic testing under stock Lua 5.4.
+- `e2e_verdict_spec.lua` tests the extracted `executeScenarios` function
+  with stub scenarios (pass, fail, crash, load-fail, mixed, unknown).
+- `unsigned_guard_spec.lua` is a static-analysis test that reads the repo
+  source files and verifies WHERE clauses don't use unguarded UNSIGNED
+  arithmetic (the `CAST(... AS SIGNED)` pattern or `>= ?` guard).
 
 ## Cycle engine (processMachine handler)
 
@@ -82,6 +88,25 @@ Persistent project facts for AI agents working on qb-czcraft.
   failure_injection, downtime_catchup, load_test.
 - All emit raw numbers (timings, stock counts, event counts, percentiles).
 - Cleanup SQL in `qb-czcraft-e2e/README.md`.
+- **CRITICAL**: All prior E2E results are retracted (2026-09-09). Three
+  harness bugs were found and fixed:
+  1. allPass verdict bug: scenario returning false never set allPass=false.
+  2. Poller infinite loop: io.open write-mode fails on [meus-scripts] paths.
+  3. No player-online precondition: all scenarios silently no-opped.
+  Four additional issues were also fixed:
+  4. Dirty-state flapping: math.random bill IDs collided on repeated runs.
+  5. UNSIGNED stock-decrement: quantity - ? underflowed before >= 0 guard.
+  6. load_test measurement: dispatch p95 measured TriggerEvent, not completion.
+  7. Harness gating: poller + command now gated behind GetResourceState.
+  See STATUS.md and SESSION.md (2026-09-09) for details.
+- The actual runner lives in `qb-czcraft/server/e2e_run.lua` (merged into
+  qb-czcraft), NOT in `qb-czcraft-e2e/server/runner.lua` (which is not
+  loaded by the fxmanifest). The poller and cze2e command are now gated
+  behind `GetResourceState('qb-czcraft-e2e')` — stopping qb-czcraft-e2e
+  fully disables the harness for the manual playtest.
+- `repair_natives` PASS confirms only server-side preconditions (vehicle
+  networking, GetEntityType==2, no-op behavior, handler structure). It does
+  NOT test the full client-side repair flow — the scenario says so itself.
 
 ## Commit discipline
 
@@ -98,3 +123,17 @@ Persistent project facts for AI agents working on qb-czcraft.
 - To disable a resource loaded via folder ensure, comment out its
   registration code (e.g., `CreateUseableItem`) rather than removing the
   folder.
+
+## Server runtime (txAdmin)
+
+- The live server runs under txAdmin server mode
+  (`+set txAdminServerMode true` in the command line).
+- **RCON is unavailable**: txAdmin does not pass through `rcon_password`
+  from server.cfg. Use the txAdmin web interface (port 40120), in-game
+  menu, or server console for commands.
+- txAdmin web interface: `http://127.0.0.1:40120/`
+- Server data path: `C:/DEV/NewRP/Planta_RP/` (confirmed via txAdmin config).
+- Server log: `C:\DEV\txData\default\logs\fxserver.log` (held open by
+  FXServer — use shared-read methods like `Get-Content -Tail`).
+- PowerShell: paths containing `[meus-scripts]` or `[qb]` need
+  `-LiteralPath` to avoid wildcard interpretation.

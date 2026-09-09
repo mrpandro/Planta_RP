@@ -62,7 +62,7 @@ local function runDowntimeCatchup()
     CZCraft.StockRepo.upsert({ machine_uuid = uuid, item_name = 'iron', quantity = 1700, reserved_quantity = 0, standard_unit_cost = 0 })
     CZCraft.StockRepo.upsert({ machine_uuid = uuid, item_name = 'metalscrap', quantity = 680, reserved_quantity = 0, standard_unit_cost = 0 })
 
-    local billId = 'e2e-downtime-1-' .. tostring(math.random(100000, 999999))
+    local billId = Slo.uniqueId('e2e-downtime-1')
     CZCraft.BillsRepo.create({
         bill_id = billId, machine_uuid = uuid, recipe_id = 'smelt_steel',
         mode = 'PRODUCE_X', primary_output = 'steel', target_quantity = 680,
@@ -151,7 +151,7 @@ local function runDowntimeCatchup()
     -- Only 50 iron = 10 cycles, but 24h downtime = 1440 cycles possible.
     CZCraft.StockRepo.upsert({ machine_uuid = uuid2, item_name = 'iron', quantity = 50, reserved_quantity = 0, standard_unit_cost = 0 })
     CZCraft.StockRepo.upsert({ machine_uuid = uuid2, item_name = 'metalscrap', quantity = 20, reserved_quantity = 0, standard_unit_cost = 0 })
-    local billId2 = 'e2e-downtime-2-' .. tostring(math.random(100000, 999999))
+    local billId2 = Slo.uniqueId('e2e-downtime-2')
     CZCraft.BillsRepo.create({
         bill_id = billId2, machine_uuid = uuid2, recipe_id = 'smelt_steel',
         mode = 'MAINTAIN_X', primary_output = 'steel', target_quantity = 100000,

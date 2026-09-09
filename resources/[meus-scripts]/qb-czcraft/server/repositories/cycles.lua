@@ -51,7 +51,7 @@ function CyclesRepo.start(params)
                 SET `quantity` = `quantity` + ?,
                     `version` = `version` + 1
                 WHERE `machine_uuid` = ? AND `item_name` = ? AND `metadata_key` = ''
-                  AND `quantity` + ? >= 0
+                  AND CAST(`quantity` AS SIGNED) + ? >= 0
             ]]
             deltaArgs[#deltaArgs + 1] = {
                 delta.quantity_delta,
@@ -66,8 +66,8 @@ function CyclesRepo.start(params)
                 SET `reserved_quantity` = `reserved_quantity` + ?,
                     `version` = `version` + 1
                 WHERE `machine_uuid` = ? AND `item_name` = ? AND `metadata_key` = ''
-                  AND `reserved_quantity` + ? >= 0
-                  AND `reserved_quantity` + ? <= `quantity`
+                  AND CAST(`reserved_quantity` AS SIGNED) + ? >= 0
+                  AND CAST(`reserved_quantity` AS SIGNED) + ? <= CAST(`quantity` AS SIGNED)
             ]]
             deltaArgs[#deltaArgs + 1] = {
                 delta.reserved_delta,
@@ -177,7 +177,7 @@ function CyclesRepo.complete(params)
                 SET `reserved_quantity` = `reserved_quantity` + ?,
                     `version` = `version` + 1
                 WHERE `machine_uuid` = ? AND `item_name` = ? AND `metadata_key` = ''
-                  AND `reserved_quantity` + ? >= 0
+                  AND CAST(`reserved_quantity` AS SIGNED) + ? >= 0
             ]]
             deltaArgs[#deltaArgs + 1] = {
                 delta.reserved_delta,
@@ -343,7 +343,7 @@ function CyclesRepo.applyCatchUpChunk(params)
                 SET `quantity` = `quantity` - ?,
                     `version` = `version` + 1
                 WHERE `machine_uuid` = ? AND `item_name` = ? AND `metadata_key` = ''
-                  AND `quantity` - ? >= 0
+                  AND `quantity` >= ?
             ]]
             deltaArgs[#deltaArgs + 1] = { total, params.machine_uuid, line.item, total }
         end

@@ -132,3 +132,164 @@ See `qb-czcraft-e2e/README.md` for prerequisites and cleanup SQL.
 - `tests/lua/.generated_test_suites.txt` (added cycle_engine_spec)
 - `resources/[meus-scripts]/qb-czcraft-e2e/` (NEW resource, 9 files)
 - `docs/qb-czcraft/STATUS.md`, `TODO.md`, `SESSION.md`, `AI_MEMORY.md` (updated)
+
+## 2026-09-09: Harness verdict bugs found and fixed — all prior E2E results retracted
+
+### Discovery: the "mystery auto-triggering process"
+
+The user flagged that an unidentified process was repeatedly triggering
+`cze2e all` on the live server, combined with RCON not matching its own
+config file — two signs the running server's state didn't match disk.
+
+Investigation:
+- No Python processes running. No txAdmin scheduled tasks. WireMCP
+  (a Wireshark/tshark MCP server) was running but unrelated to FiveM.
+- The server was cleanly restarted at 04:17 today (new PIDs, old ones gone).
+- The `e2e_command.txt` file had `all` (3 bytes, mtime yesterday) and was
+  never truncated by the poller.
+- The log showed 340+ `cze2e all` runs in ~4 minutes, each completing
+  instantly (all scenarios failing with "no players online").
+- Truncating the file from PowerShell stopped the loop immediately.
+
+**Root cause**: the file-IPC poller in `e2e_run.lua` used
+`io.open(COMMAND_FILE, 'w')` to truncate the command file after reading.
+This silently fails on bracketed paths (`[meus-scripts]`) in FiveM's
+sandboxed I/O. The file was never consumed, so the poller re-executed
+the same command every second indefinitely. No external process —
+self-inflicted by the harness.
+
+### Discovery: RCON config drift explained
+
+`server.cfg` has `rcon_password "cze2e_rcon_2026"` but the live server
+returns "The server must set rcon_password." This is not a stale process
+or config-not-applied — it's txAdmin server mode. The command line
+includes `+set txAdminServerMode true`, which takes over server
+administration via its own web interface (port 40120) and does not pass
+through the Quake-3 RCON password. RCON is effectively disabled under
+txAdmin. Use the txAdmin web interface, in-game menu, or server console.
+
+### Discovery: OVERALL: PASS verdict bug (critical)
+
+While investigating, found that all 6 scenarios showed FAIL ("no players
+online") but the report said `OVERALL: PASS`. The root cause is in
+`runAll` (line 224): when a scenario returns `false`, `pcall` returns
+`(true, false)` — `runOk=true`, `runErr=false`. The code set
+`results[name] = runErr` (correctly recording false) but **never set
+`allPass = false`**. The `allPass` flag was only updated on crash or
+load-failure, not on a scenario returning false.
+
+**This means every prior `OVERALL: PASS` in the project's history was
+"nothing crashed," not "everything passed." The verdict line was never
+trustworthy for any run, ever.** All prior E2E results are retracted.
+
+### Fixes applied (3 bugs)
+
+1. **allPass verdict bug** (`e2e_run.lua`):
+   - Extracted the execution loop into `executeScenarios(scenarios, order,
+     emitFn)` — a pure function that takes a scenarios table, order list,
+     and emit function, returns `(results, allPass)`.
+   - Added `if not runErr then allPass = false end` at the false-return
+     path (line 229).
+   - Exported as `CZE2E._executeScenarios` for unit testing.
+   - Also fixed the identical bug in `qb-czcraft-e2e/server/runner.lua`
+     (line 82) — not loaded currently, but has the same code.
+
+2. **Poller infinite loop** (`e2e_run.lua` file-IPC poller):
+   - Replaced `io.open(COMMAND_FILE, 'w')` with `os.remove` (primary) +
+     `io.open` write-mode (fallback) + skip-execution guard if both fail.
+   - If consumption fails, the poller logs a WARNING and skips execution
+     instead of re-executing the same command forever.
+
+3. **Player-online precondition** (`e2e_run.lua` `runAll`):
+   - Added `GetPlayers()` check at the top of `runAll`. If no player is
+     online, it emits `PRECONDITION FAILED`, `OVERALL: FAIL`, and returns
+     false — instead of running all 6 scenarios into a guaranteed-failure
+     no-op.
+
+### Regression test
+
+`tests/lua/unit/qb-czcraft/e2e_verdict_spec.lua` (8 tests):
+- scenario returning false → allPass=false (the core regression)
+- scenario returning true → allPass=true
+- scenario that crashes → allPass=false
+- scenario that fails to load → allPass=false
+- mixed pass/fail → allPass=false
+- all pass → allPass=true
+- unknown scenario → allPass=false
+- emit receives per-scenario lines
+
+All 8 pass. Full qb-czcraft suite: 222 tests, 0 failures.
+
+### Additional findings (not yet fixed)
+
+- **load_test measurement scope**: action dispatch p95=0ms times
+  `TriggerEvent` (returns immediately), not end-to-end completion. The
+  stall detector wraps only the dispatch call — a real 236ms engine hitch
+  during provisioning was missed. "No Lua stall > 50ms" is true for the
+  measured segment, false for the run as a whole.
+- **UNSIGNED stock-decrement**: `quantity - 5` on an UNSIGNED column
+  errors before the `>= 0` guard protects it. Fail-closed by accident,
+  via errors. Needs a dedicated fix + regression test.
+- **Dirty-state flapping**: harness doesn't clean up its own DB rows.
+  `load_test` bill IDs use `math.random` 6-digit suffixes that collide
+  on repeated runs. Clean run → PASS, immediate re-run → FAIL (Duplicate
+  entry on `czcraft_bills.PRIMARY`).
+- **e2e_run.lua merged into qb-czcraft**: the harness runner lives inside
+  qb-czcraft proper, so "unload the harness" is structurally impossible.
+  Must be separated or gated behind a feature flag.
+
+### Additional fixes (2026-09-09, same session)
+
+All four remaining harness issues were also fixed:
+
+- **UNSIGNED stock-decrement**: `quantity - ?` and `quantity + ?` on
+  UNSIGNED columns underflowed before the `>= 0` guard. Fixed with
+  `CAST(quantity AS SIGNED)` in WHERE clauses (`stock.lua`, `cycles.lua`)
+  and `quantity >= ?` in `applyCatchUpChunk`. Regression test:
+  `unsigned_guard_spec.lua` (10 static-analysis tests).
+- **Dirty-state flapping**: `Slo.uniqueId()` replaces `math.random` for
+  bill/cycle/machine IDs. `Slo.cleanup()` auto-deletes e2e-prefixed rows
+  before `cze2e all`. No more collisions on repeated runs.
+- **load_test measurement scope**: end-to-end completion p95 replaces
+  dispatch-only p95. Stall detector now covers provisioning + settle-wait.
+  The SLO threshold applies to completion, not dispatch.
+- **Harness gating**: poller + cze2e command gated behind
+  `GetResourceState('qb-czcraft-e2e')`. Stopping the resource fully
+  disables the harness for the manual playtest.
+
+### Files changed this session
+
+- `resources/[meus-scripts]/qb-czcraft/server/e2e_run.lua` (3 bug fixes +
+  extract executeScenarios + export for testing + harness gating)
+- `resources/[meus-scripts]/qb-czcraft-e2e/server/runner.lua` (same
+  allPass verdict fix — not loaded currently, but has identical code)
+- `resources/[meus-scripts]/qb-czcraft-e2e/server/slo.lua` (uniqueId +
+  cleanup functions)
+- `resources/[meus-scripts]/qb-czcraft-e2e/server/scenarios/*.lua`
+  (replaced all math.random with Slo.uniqueId, added local Slo to concurrent.lua)
+- `resources/[meus-scripts]/qb-czcraft-e2e/README.md` (updated cleanup docs)
+- `resources/[meus-scripts]/qb-czcraft/server/repositories/stock.lua`
+  (CAST AS SIGNED in WHERE guards)
+- `resources/[meus-scripts]/qb-czcraft/server/repositories/cycles.lua`
+  (CAST AS SIGNED + quantity >= ? guards)
+- `resources/[meus-scripts]/qb-czcraft-e2e/server/scenarios/load_test.lua`
+  (end-to-end completion timing + provisioning stall detector)
+- `tests/lua/unit/qb-czcraft/e2e_verdict_spec.lua` (NEW, 8 regression tests)
+- `tests/lua/unit/qb-czcraft/unsigned_guard_spec.lua` (NEW, 10 tests)
+- `docs/qb-czcraft/STATUS.md`, `TODO.md`, `SESSION.md`, `AI_MEMORY.md`
+  (all prior E2E results retracted, gate remains open)
+
+### Test results
+
+- 232 Lua tests pass (0 failures)
+- 33 web tests pass (unchanged)
+- Full repo Lua suite still exits nonzero due to pre-existing
+  qb-inventory/qb-weapons broken suites (unrelated to qb-czcraft)
+
+### Next steps
+
+1. Restart qb-czcraft via txAdmin to load the fixes.
+2. Re-run `cze2e all` with a player online — first trustworthy verdict.
+3. Harness-removed manual playtest (requires human at game client):
+   stop qb-czcraft-e2e, place machines, run chain, test repairkit.
+4. Decide rollout checklist items (audit/security/admin/rollback).

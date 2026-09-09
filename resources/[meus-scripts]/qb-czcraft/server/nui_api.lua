@@ -148,12 +148,6 @@ local function getOwnerOverview(source)
     -- Count active bills across all owned machines.
     local billCount = 0
     if #machines > 0 then
-        local uuids = {}
-        for _, m in ipairs(machines) do
-            uuids[#uuids + 1] = m.machine_uuid
-        end
-        local placeholders = string.rep('?', #uuids):gsub('?', '%s', 1)
-        -- Use a simpler approach: query count for each machine.
         for _, m in ipairs(machines) do
             local row = MySQL.single.await([[
                 SELECT COUNT(*) AS cnt FROM `czcraft_bills`

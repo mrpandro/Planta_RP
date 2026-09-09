@@ -68,6 +68,13 @@ end
 -- @return boolean ok
 -- @return string|nil error
 function StockRepo.applyDelta(machineUuid, itemName, metadataKey, expectedVersion, quantityDelta, reservedDelta)
+    -- Guards use CAST(... AS SIGNED) to avoid BIGINT UNSIGNED underflow.
+    -- The quantity/reserved_quantity columns are INT(10) UNSIGNED, so
+    -- `quantity + (-5) >= 0` underflows and throws "INTEGER UNSIGNED value
+    -- is out of range" before the >= 0 comparison can protect it. Casting
+    -- to SIGNED makes the arithmetic safe; the comparison result is the
+    -- same. The SET clause is safe because the WHERE clause ensures the
+    -- post-delta values are valid before the UPDATE executes.
     local affected = MySQL.update.await([[
         UPDATE `czcraft_machine_stock`
         SET `quantity`          = `quantity` + ?,
@@ -77,9 +84,9 @@ function StockRepo.applyDelta(machineUuid, itemName, metadataKey, expectedVersio
           AND `item_name` = ?
           AND `metadata_key` = ?
           AND `version` = ?
-          AND `quantity` + ? >= 0
-          AND `reserved_quantity` + ? >= 0
-          AND `reserved_quantity` + ? <= `quantity` + ?
+          AND CAST(`quantity` AS SIGNED) + ? >= 0
+          AND CAST(`reserved_quantity` AS SIGNED) + ? >= 0
+          AND CAST(`reserved_quantity` AS SIGNED) + ? <= CAST(`quantity` AS SIGNED) + ?
     ]], {
         quantityDelta, reservedDelta,
         machineUuid, itemName, metadataKey or '', expectedVersion,

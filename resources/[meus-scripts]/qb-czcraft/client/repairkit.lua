@@ -204,18 +204,12 @@ AddEventHandler('qb-czcraft:client:repairkit:fail', function(reason)
     CZCraftClient.QBCore.Functions.Notify(reason or 'Repair failed', 'error')
 end)
 
--- Hook into the repairkit usable item.
-CreateThread(function()
-    -- Wait for QBCore to be available.
-    while not CZCraftClient.QBCore do
-        Wait(100)
-    end
-
-    -- Register the useable item hook. QBCore fires QBCore:Client:UseItem.
-    AddEventHandler('QBCore:Client:UseItem', function(itemName)
-        if itemName ~= 'repairkit' then return end
-        startRepair()
-    end)
+-- Hook into the repairkit usable item. The server-side CreateUseableItem
+-- callback fires this event. (The previous code listened for
+-- 'QBCore:Client:UseItem' which no resource actually fires.)
+RegisterNetEvent('qb-czcraft:client:useRepairkit')
+AddEventHandler('qb-czcraft:client:useRepairkit', function()
+    startRepair()
 end)
 
 CZCraftClient.Repairkit = Repairkit

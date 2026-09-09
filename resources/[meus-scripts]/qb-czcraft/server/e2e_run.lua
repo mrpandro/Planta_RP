@@ -11,9 +11,13 @@
 -- a scenario.
 
 local E2E_RESOURCE = 'qb-czcraft-e2e'
-local COMMAND_FILE = 'resources/[meus-scripts]/qb-czcraft-e2e/e2e_command.txt'
-local OUTPUT_FILE = 'resources/[meus-scripts]/qb-czcraft-e2e/e2e_output.txt'
-local STATUS_FILE = 'resources/[meus-scripts]/qb-czcraft-e2e/e2e_status.txt'
+-- IPC files live OUTSIDE the bracketed [meus-scripts] path because FiveM's
+-- sandboxed io.open write-mode and os.remove silently fail on bracketed
+-- paths. The e2e_ipc/ directory is at the server data root.
+local IPC_DIR = 'e2e_ipc'
+local COMMAND_FILE = IPC_DIR .. '/e2e_command.txt'
+local OUTPUT_FILE = IPC_DIR .. '/e2e_output.txt'
+local STATUS_FILE = IPC_DIR .. '/e2e_status.txt'
 
 -- Output capture: writes to the output file AND the server console.
 -- Does NOT patch the global print — that would alter qb-czcraft's behavior.
@@ -196,41 +200,81 @@ local SCENARIOS = {
     load_test = function() return loadScenario('server/scenarios/load_test.lua') end,
 }
 
-local function runAll()
-    emit('[E2E] ========== RUNNING ALL SCENARIOS ==========')
-    local order = { 'repair_natives', 'production_chain', 'concurrent', 'failure_injection', 'downtime_catchup', 'load_test' }
+-- Executes a set of scenarios and returns per-scenario results + overall verdict.
+-- Extracted from runAll for testability: the verdict aggregation logic is subtle
+-- (pcall returns true,false when a scenario returns false) and had a bug where
+-- allPass was never updated on false returns — every prior "OVERALL: PASS" was
+-- unverified because the code path that would set allPass=false on a scenario
+-- returning false did not exist.
+local function executeScenarios(scenarios, order, emitFn)
     local results = {}
     local allPass = true
     for _, name in ipairs(order) do
-        emit(('[E2E] >>> running scenario: %s'):format(name))
-        local loader = SCENARIOS[name]
+        emitFn(('[E2E] >>> running scenario: %s'):format(name))
+        local loader = scenarios[name]
         if not loader then
-            emit(('[E2E] unknown scenario: %s'):format(name))
+            emitFn(('[E2E] unknown scenario: %s'):format(name))
             results[name] = false
             allPass = false
         else
             local ok, runner = pcall(loader)
             if not ok then
-                emit(('[E2E] scenario %s failed to load: %s'):format(name, tostring(runner)))
+                emitFn(('[E2E] scenario %s failed to load: %s'):format(name, tostring(runner)))
                 results[name] = false
                 allPass = false
             else
                 local runOk, runErr = pcall(runner)
                 if not runOk then
-                    emit(('[E2E] scenario %s crashed: %s'):format(name, tostring(runErr)))
+                    emitFn(('[E2E] scenario %s crashed: %s'):format(name, tostring(runErr)))
                     results[name] = false
                     allPass = false
                 else
                     results[name] = runErr
+                    if not runErr then allPass = false end
                 end
             end
         end
     end
+    return results, allPass
+end
+
+local function runAll()
+    -- Precondition: require at least one player online. Scenarios need a
+    -- player to anchor vehicle spawns and provide an owner citizenid for
+    -- test machines. Without one, every scenario silently no-ops with
+    -- "no players online" — running the full suite is meaningless.
+    local players = GetPlayers()
+    if not players or #players == 0 then
+        emit('[E2E] ========== PRECONDITION FAILED ==========')
+        emit('[E2E] REFUSING TO RUN: no players online.')
+        emit('[E2E] Scenarios require a player for vehicle spawning and owner context.')
+        emit('[E2E] ========== OVERALL: FAIL ==========')
+        return false
+    end
+
+    emit('[E2E] ========== RUNNING ALL SCENARIOS ==========')
+
+    -- Clean up any stale e2e-prefixed rows from previous runs before
+    -- starting. The harness previously did not clean up its own rows,
+    -- causing dirty-state flapping (duplicate bill IDs, stale machines).
+    if CZE2E and CZE2E.Slo and CZE2E.Slo.cleanup then
+        CZE2E.Slo.cleanup()
+    end
+
+    local order = { 'repair_natives', 'production_chain', 'concurrent', 'failure_injection', 'downtime_catchup', 'load_test' }
+    local results, allPass = executeScenarios(SCENARIOS, order, emit)
     emit('[E2E] ========== SCENARIO RESULTS ==========')
     for _, name in ipairs(order) do
         emit(('[E2E]   %s: %s'):format(name, results[name] and 'PASS' or 'FAIL'))
     end
     emit(('[E2E] ========== OVERALL: %s =========='):format(allPass and 'PASS' or 'FAIL'))
+
+    -- Clean up e2e-prefixed rows after the run too, so the load_test
+    -- machines (1000+) don't pollute the production tables.
+    if CZE2E and CZE2E.Slo and CZE2E.Slo.cleanup then
+        CZE2E.Slo.cleanup()
+    end
+
     return allPass
 end
 
@@ -257,8 +301,17 @@ local function runScenario(scenario)
 end
 
 -- Also register the console command.
+-- Gated by the qb-czcraft-e2e resource state: if qb-czcraft-e2e is not
+-- running, the command is disabled. This allows the manual playtest to
+-- stop qb-czcraft-e2e and be confident the harness is fully disabled,
+-- even though e2e_run.lua lives inside qb-czcraft.
 RegisterCommand('cze2e', function(source, args)
     if source ~= 0 then return end
+    if GetResourceState('qb-czcraft-e2e') ~= 'started' then
+        print('[E2E] cze2e command disabled: qb-czcraft-e2e resource is not running.')
+        print('[E2E] To enable: ensure qb-czcraft-e2e. To do the manual playtest: keep it stopped.')
+        return
+    end
     local scenario = args[1] or 'all'
     capturing = true
     local f = io.open(OUTPUT_FILE, 'w')
@@ -271,44 +324,87 @@ RegisterCommand('cze2e', function(source, args)
 end, true)
 
 -- File-based command poller.
--- Overwrites the command file with empty content after reading to mark as consumed.
+-- Consumes the command file by deletion (os.remove) before executing, with
+-- io.open truncation as a fallback. If both fail, execution is skipped to
+-- prevent infinite re-execution loops — the prior code used io.open write-
+-- mode truncation which silently fails on bracketed paths ([meus-scripts])
+-- in FiveM, causing the poller to re-execute the same command every second
+-- indefinitely.
 CreateThread(function()
     while true do
         Wait(1000)
+        -- Only poll when the E2E resource is running. This allows the
+        -- manual playtest to stop qb-czcraft-e2e and be confident the
+        -- poller is not watching for commands.
+        if GetResourceState('qb-czcraft-e2e') ~= 'started' then
+            goto continue
+        end
         local f = io.open(COMMAND_FILE, 'r')
         if f then
             local cmd = f:read('*l')
             f:close()
-            -- Overwrite with empty content to mark as consumed.
-            local cf = io.open(COMMAND_FILE, 'w')
-            if cf then cf:close() end
+
+            -- Consume the command file before executing. Try os.remove
+            -- first (more reliable than io.open write-mode on bracketed
+            -- paths), then fall back to truncation. If both fail, skip
+            -- execution to prevent infinite re-execution loops.
+            -- NOTE: pcall(os.remove, ...) returns true even when os.remove
+            -- returns nil, err (failure without throwing). Must check the
+            -- second return value (os.remove's actual return) too.
+            local consumed = false
+            local rmOk, rmRes = pcall(os.remove, COMMAND_FILE)
+            if rmOk and rmRes then
+                consumed = true
+            end
+            if not consumed then
+                local cf = io.open(COMMAND_FILE, 'w')
+                if cf then
+                    cf:close()
+                    consumed = true
+                end
+            end
 
             if cmd and cmd ~= '' then
-                local of = io.open(OUTPUT_FILE, 'w')
-                if of then of:close() end
-                local sf = io.open(STATUS_FILE, 'w')
-                if sf then sf:write('running'); sf:close() end
+                if not consumed then
+                    emit('[E2E] WARNING: could not consume command file (os.remove and io.open both failed)')
+                    emit('[E2E] WARNING: skipping execution to prevent infinite loop')
+                else
+                    local of = io.open(OUTPUT_FILE, 'w')
+                    if of then of:close() end
+                    local sf = io.open(STATUS_FILE, 'w')
+                    if sf then sf:write('running'); sf:close() end
 
-                capturing = true
-                emit(('[E2E] e2e runner: executing "%s"'):format(cmd))
-                local ok, result = pcall(runScenario, cmd)
-                capturing = false
+                    capturing = true
+                    emit(('[E2E] e2e runner: executing "%s"'):format(cmd))
+                    local ok, result = pcall(runScenario, cmd)
+                    capturing = false
 
-                if not ok then
-                    emit('[E2E] fatal error: ' .. tostring(result))
-                end
+                    if not ok then
+                        emit('[E2E] fatal error: ' .. tostring(result))
+                    end
 
-                sf = io.open(STATUS_FILE, 'w')
-                if sf then
-                    sf:write(ok and 'done' or 'error')
-                    sf:close()
+                    sf = io.open(STATUS_FILE, 'w')
+                    if sf then
+                        sf:write(ok and 'done' or 'error')
+                        sf:close()
+                    end
                 end
             end
         end
+        ::continue::
     end
 end)
 
 print('[qb-czcraft] E2E runner loaded. Write scenario name to e2e_command.txt to trigger.')
+
+-- Export for unit testing (the executeScenarios function is pure: it takes
+-- a scenarios table, an order list, and an emit function, and returns
+-- results + allPass. The verdict aggregation logic is tested in
+-- tests/lua/unit/qb-czcraft/e2e_verdict_spec.lua.)
+-- CZE2E may be nil if qb-czcraft-e2e hasn't loaded yet (load order: qb-czcraft
+-- loads first). Initialize it defensively so the export doesn't error.
+CZE2E = CZE2E or {}
+CZE2E._executeScenarios = executeScenarios
 
 -- Diagnostic: verify what's accessible in this environment.
 -- Checks CZCraft globals, vehicle natives via multiple access methods,

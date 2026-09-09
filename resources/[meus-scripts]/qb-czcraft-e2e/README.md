@@ -12,7 +12,8 @@ just pass/fail.
 2. **At least one player online** — several scenarios need a player to anchor
    vehicle spawns and provide an owner citizenid for test machines.
 3. **Staging database** you can dirty (the harness creates machine/bill/stock/
-   cycle rows). Clean up with:
+   cycle rows). `cze2e all` now automatically cleans up e2e-prefixed rows
+   before running. For manual cleanup:
    ```sql
    DELETE FROM czcraft_production_events WHERE machine_uuid LIKE '%e2e-%';
    DELETE FROM czcraft_active_cycles WHERE machine_uuid LIKE '%e2e-%';
@@ -108,5 +109,7 @@ console log to retain the raw output for the gate record.
   item on a damaged vehicle) — that requires a client-side test driver. The
   `repair_natives` scenario verifies the server-side native precondition that
   the repairkit handler depends on.
-- It does not clean up its own DB rows — run the cleanup SQL above after each
-  full run.
+- It does not clean up its own DB rows after a run, but `cze2e all`
+  now cleans up e2e-prefixed rows BEFORE running. Individual scenario
+  runs (`cze2e load_test`, etc.) do not auto-clean — run `cze2e all`
+  or the manual cleanup SQL above if needed.

@@ -16,6 +16,20 @@ local placementContext = nil
 local ghostEntity = nil
 local placementRotation = 0.0
 
+-- Converts camera rotation to a direction vector.
+-- FiveM does not expose RotationToDirection as a native; this is the
+-- standard manual implementation. Must be defined before raycastGround.
+local function RotationToDirection(rotation)
+    local z = math.rad(rotation.z)
+    local x = math.rad(rotation.x)
+    local num = math.abs(math.cos(x))
+    return vector3(
+        -math.sin(z) * num,
+        math.cos(z) * num,
+        math.sin(x)
+    )
+end
+
 -- Raycast from the player's camera to find a ground/world hit point.
 -- @return vector3|nil hitCoords
 local function raycastGround()
@@ -37,18 +51,6 @@ local function raycastGround()
         return hitCoords
     end
     return nil
-end
-
--- Converts camera rotation to a direction vector.
-local function RotationToDirection(rotation)
-    local z = math.rad(rotation.z)
-    local x = math.rad(rotation.x)
-    local num = math.abs(math.cos(x))
-    return vector3(
-        -math.sin(z) * num,
-        math.cos(z) * num,
-        math.sin(x)
-    )
 end
 
 -- Finds the prop model for a machine item name.
@@ -101,11 +103,17 @@ CreateThread(function()
             Wait(200)
         else
             updateGhost()
-            -- Rotate with mouse wheel / scroll.
-            if IsControlJustPressed(0, 174) then -- SCROLLUP
+            -- Rotate with mouse wheel / scroll OR left/right arrow keys.
+            if IsControlJustPressed(0, 174) then -- SCROLLUP / arrow left
                 placementRotation = placementRotation + 15.0
                 if placementRotation >= 360.0 then placementRotation = placementRotation - 360.0 end
-            elseif IsControlJustPressed(0, 175) then -- SCROLLDOWN
+            elseif IsControlJustPressed(0, 175) then -- SCROLLDOWN / arrow right
+                placementRotation = placementRotation - 15.0
+                if placementRotation < 0.0 then placementRotation = placementRotation + 360.0 end
+            elseif IsControlJustPressed(0, 108) then -- INPUT_FRONTEND_RLEFT (left arrow)
+                placementRotation = placementRotation + 15.0
+                if placementRotation >= 360.0 then placementRotation = placementRotation - 360.0 end
+            elseif IsControlJustPressed(0, 109) then -- INPUT_FRONTEND_RRIGHT (right arrow)
                 placementRotation = placementRotation - 15.0
                 if placementRotation < 0.0 then placementRotation = placementRotation + 360.0 end
             end

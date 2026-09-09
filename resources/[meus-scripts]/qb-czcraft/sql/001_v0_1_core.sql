@@ -190,7 +190,7 @@ CREATE TABLE IF NOT EXISTS `czcraft_operations` (
     `bill_id`        CHAR(36)         DEFAULT NULL,
     `type`           VARCHAR(50)      NOT NULL,
     `stage`          VARCHAR(50)      NOT NULL DEFAULT 'PENDING',
-    `payload_hash`   CHAR(64)         NOT NULL,
+    `payload_hash`   VARCHAR(512)     NOT NULL,
     `status`         VARCHAR(50)      NOT NULL DEFAULT 'PENDING',
     `error`          TEXT             DEFAULT NULL,
     `version`        INT(10) UNSIGNED NOT NULL DEFAULT 0,
