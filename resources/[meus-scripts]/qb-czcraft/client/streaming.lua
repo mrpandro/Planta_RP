@@ -38,8 +38,11 @@ local function createProp(projection)
     end
     if not HasModelLoaded(hash) then return end
 
+    -- Render at the authoritative server transform. Do NOT call
+    -- PlaceObjectOnGroundProperly here: it snaps to the world terrain
+    -- heightmap, which ignores house-shell interior floors and would bury
+    -- props placed inside a shell.
     local entity = CreateObject(hash, projection.pos_x, projection.pos_y, projection.pos_z, false, false, false)
-    PlaceObjectOnGroundProperly(entity)
     SetEntityHeading(entity, projection.heading or 0.0)
     FreezeEntityPosition(entity, true)
 

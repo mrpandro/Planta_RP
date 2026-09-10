@@ -104,6 +104,28 @@ local function runBootstrap()
             reason = schemaResult.reason,
         },
     }
+
+    -- Startup reconciliation: fix any machines left with a stale owner_id
+    -- after a crash between a house transfer (player_houses UPDATE) and
+    -- transferHouseMachines completing. risks.md flags this as non-atomic
+    -- by design; this pass makes the result convergent at the next startup.
+    -- Only runs when the schema gate passed and the machines repo is loaded.
+    if result.isReady and CZCraft.MachinesRepo and CZCraft.MachinesRepo.reconcileHouseMachineOwners then
+        local ok, count, details = pcall(CZCraft.MachinesRepo.reconcileHouseMachineOwners)
+        if ok and count and count > 0 then
+            print(('[qb-czcraft] House-transfer reconciliation: %d machine(s) reassigned to current house owner'):format(count))
+            if CZCraft.AuditRepo and CZCraft.AuditRepo.append then
+                CZCraft.AuditRepo.append({
+                    actor_type = 'SYSTEM', actor_id = 'startup-reconciliation',
+                    action = 'HOUSE_TRANSFER_RECONCILIATION',
+                    next_state = { machines_reconciled = count, details = details },
+                    reason = 'startup reconciliation for stale machine owners',
+                })
+            end
+        elseif not ok then
+            print(('[qb-czcraft] House-transfer reconciliation failed: %s'):format(tostring(count)))
+        end
+    end
 end
 
 -- Wait for oxmysql to be connected before querying the schema-version table.

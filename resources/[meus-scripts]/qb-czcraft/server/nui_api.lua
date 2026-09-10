@@ -89,6 +89,43 @@ local function hasProductionAccess(source, machine, playerData)
     return false
 end
 
+-- Checks if the player has manager permission on a machine (required for
+-- maintenance and upgrades per v0.2 plan: "MANAGER necessário para
+-- upgrade/maintenance").
+-- @param source number
+-- @param machine table
+-- @param playerData table
+-- @return boolean hasManagerAccess
+local function hasManagerAccess(source, machine, playerData)
+    if not machine or not playerData then return false end
+
+    if machine.owner_type == CZCraft.OwnerType.PLAYER then
+        if machine.owner_id == playerData.citizenid then
+            return true
+        end
+        if machine.location_type == CZCraft.LocationType.HOUSE then
+            local access = CZCraft.QbHousesAdapter.resolveHouseAccess(source, machine.location_id)
+            return access.isOwner or access.isKeyholder
+        end
+    elseif machine.owner_type == CZCraft.OwnerType.JOB or machine.owner_type == CZCraft.OwnerType.GANG then
+        local stillMember = CZCraft.Permissions.isStillOrgMember(
+            { type = machine.owner_type, id = machine.owner_id }, playerData
+        )
+        if stillMember then
+            local gradeKey
+            if machine.owner_type == CZCraft.OwnerType.JOB then
+                gradeKey = tostring(playerData.job.grade and playerData.job.grade.level or 0)
+            else
+                gradeKey = tostring(playerData.gang.grade and playerData.gang.grade.level or 0)
+            end
+            local granted = CZCraft.Permissions.resolveOrgPermissions(machine.owner_type, gradeKey, CZCraft.Config.Access)
+            return CZCraft.Permissions.hasPermission(granted, CZCraft.Permission.MANAGER)
+        end
+    end
+
+    return false
+end
+
 -- Validates that the player is near the machine.
 -- @param source number
 -- @param machine table
@@ -231,6 +268,13 @@ local function getMachineData(source, params)
             locationType = machine.location_type,
             locationId = machine.location_id,
             version = tonumber(machine.version) or 0,
+            condition = tonumber(machine.condition),
+            powerLevel = tonumber(machine.power_level),
+            upgradeSpeedLevel = tonumber(machine.upgrade_speed_level) or 0,
+            upgradeCapacityLevel = tonumber(machine.upgrade_capacity_level) or 0,
+            upgradeEfficiencyLevel = tonumber(machine.upgrade_efficiency_level) or 0,
+            upgradeDurabilityLevel = tonumber(machine.upgrade_durability_level) or 0,
+            upgradeBudgetUsed = tonumber(machine.upgrade_budget_used) or 0,
         },
     }
 end
@@ -576,6 +620,126 @@ local function removeBill(source, params)
     return { success = true }
 end
 
+-- Performs maintenance on a machine (restore condition, consume kit, debit $200).
+-- Requires MANAGER permission per v0.2 plan.
+-- @param source number
+-- @param params table { machineUuid }
+-- @return table { success, reason?, conditionBefore?, conditionAfter?, restored? }
+local function performMaintenance(source, params)
+    if not CZCraft.Runtime or not CZCraft.Runtime.isReady then
+        return { success = false, reason = 'qb-czcraft is not ready' }
+    end
+    if type(params) ~= 'table' or type(params.machineUuid) ~= 'string' then
+        return { success = false, reason = 'machineUuid required' }
+    end
+
+    local playerData = CZCraft.QBCoreAdapter.getPlayerData(source)
+    if not playerData then
+        return { success = false, reason = 'player not found' }
+    end
+
+    local machine = CZCraft.MachinesRepo.load(params.machineUuid)
+    if not machine then
+        return { success = false, reason = 'machine not found' }
+    end
+
+    if not hasManagerAccess(source, machine, playerData) then
+        return { success = false, reason = 'no manager permission on this machine' }
+    end
+
+    if not isNearMachine(source, machine) then
+        return { success = false, reason = 'too far from the machine' }
+    end
+
+    return CZCraft.MaintenanceService.performMaintenance({
+        machine_uuid = params.machineUuid,
+        source = source,
+        citizenid = playerData.citizenid,
+    })
+end
+
+-- Purchases one level of an upgrade track for a machine.
+-- Requires MANAGER permission per v0.2 plan.
+-- @param source number
+-- @param params table { machineUuid, track }
+-- @return table { success, reason?, newLevel?, pointsSpent? }
+local function purchaseUpgrade(source, params)
+    if not CZCraft.Runtime or not CZCraft.Runtime.isReady then
+        return { success = false, reason = 'qb-czcraft is not ready' }
+    end
+    if type(params) ~= 'table' or type(params.machineUuid) ~= 'string' then
+        return { success = false, reason = 'machineUuid required' }
+    end
+    if type(params.track) ~= 'string' then
+        return { success = false, reason = 'track required' }
+    end
+
+    local playerData = CZCraft.QBCoreAdapter.getPlayerData(source)
+    if not playerData then
+        return { success = false, reason = 'player not found' }
+    end
+
+    local machine = CZCraft.MachinesRepo.load(params.machineUuid)
+    if not machine then
+        return { success = false, reason = 'machine not found' }
+    end
+
+    if not hasManagerAccess(source, machine, playerData) then
+        return { success = false, reason = 'no manager permission on this machine' }
+    end
+
+    if not isNearMachine(source, machine) then
+        return { success = false, reason = 'too far from the machine' }
+    end
+
+    return CZCraft.UpgradesService.purchaseUpgrade({
+        machine_uuid = params.machineUuid,
+        track = params.track,
+        source = source,
+        citizenid = playerData.citizenid,
+    })
+end
+
+-- Downgrades (removes) one level of an upgrade track for a machine.
+-- Requires MANAGER permission per v0.2 plan. Budget points are NOT refunded.
+-- @param source number
+-- @param params table { machineUuid, track }
+-- @return table { success, reason?, newLevel? }
+local function downgradeUpgrade(source, params)
+    if not CZCraft.Runtime or not CZCraft.Runtime.isReady then
+        return { success = false, reason = 'qb-czcraft is not ready' }
+    end
+    if type(params) ~= 'table' or type(params.machineUuid) ~= 'string' then
+        return { success = false, reason = 'machineUuid required' }
+    end
+    if type(params.track) ~= 'string' then
+        return { success = false, reason = 'track required' }
+    end
+
+    local playerData = CZCraft.QBCoreAdapter.getPlayerData(source)
+    if not playerData then
+        return { success = false, reason = 'player not found' }
+    end
+
+    local machine = CZCraft.MachinesRepo.load(params.machineUuid)
+    if not machine then
+        return { success = false, reason = 'machine not found' }
+    end
+
+    if not hasManagerAccess(source, machine, playerData) then
+        return { success = false, reason = 'no manager permission on this machine' }
+    end
+
+    if not isNearMachine(source, machine) then
+        return { success = false, reason = 'too far from the machine' }
+    end
+
+    return CZCraft.UpgradesService.downgradeUpgrade({
+        machine_uuid = params.machineUuid,
+        track = params.track,
+    })
+end
+
 -- Register all lib.callback handlers.
 lib.callback.register('qb-czcraft:server:nui:getOwnerOverview', getOwnerOverview)
 lib.callback.register('qb-czcraft:server:nui:getMachineData', getMachineData)
@@ -586,6 +750,9 @@ lib.callback.register('qb-czcraft:server:nui:createBill', createBill)
 lib.callback.register('qb-czcraft:server:nui:pauseBill', pauseBill)
 lib.callback.register('qb-czcraft:server:nui:resumeBill', resumeBill)
 lib.callback.register('qb-czcraft:server:nui:removeBill', removeBill)
+lib.callback.register('qb-czcraft:server:nui:performMaintenance', performMaintenance)
+lib.callback.register('qb-czcraft:server:nui:purchaseUpgrade', purchaseUpgrade)
+lib.callback.register('qb-czcraft:server:nui:downgradeUpgrade', downgradeUpgrade)
 
 NuiApi.getOwnerOverview = getOwnerOverview
 NuiApi.getMachineData = getMachineData
@@ -596,6 +763,9 @@ NuiApi.createBill = createBill
 NuiApi.pauseBill = pauseBill
 NuiApi.resumeBill = resumeBill
 NuiApi.removeBill = removeBill
+NuiApi.performMaintenance = performMaintenance
+NuiApi.purchaseUpgrade = purchaseUpgrade
+NuiApi.downgradeUpgrade = downgradeUpgrade
 
 CZCraft.NuiApi = NuiApi
 return NuiApi

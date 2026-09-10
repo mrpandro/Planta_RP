@@ -13,8 +13,8 @@ function BillsRepo.load(billId)
     return MySQL.single.await([[
         SELECT `bill_id`, `machine_uuid`, `recipe_id`, `mode`, `primary_output`,
                `target_quantity`, `produced_quantity`, `enabled`, `status`,
-               `block_reason`, `block_detail`, `priority`, `created_by_type`,
-               `created_by_id`, `created_sequence`, `version`
+               `block_reason`, `block_detail`, `priority`, `until_threshold`,
+               `created_by_type`, `created_by_id`, `created_sequence`, `version`
         FROM `czcraft_bills`
         WHERE `bill_id` = ?
     ]], { billId })
@@ -27,8 +27,8 @@ function BillsRepo.listForMachine(machineUuid)
     return MySQL.query.await([[
         SELECT `bill_id`, `machine_uuid`, `recipe_id`, `mode`, `primary_output`,
                `target_quantity`, `produced_quantity`, `enabled`, `status`,
-               `block_reason`, `block_detail`, `priority`, `created_by_type`,
-               `created_by_id`, `created_sequence`, `version`
+               `block_reason`, `block_detail`, `priority`, `until_threshold`,
+               `created_by_type`, `created_by_id`, `created_sequence`, `version`
         FROM `czcraft_bills`
         WHERE `machine_uuid` = ?
         ORDER BY `created_sequence` ASC
@@ -42,8 +42,8 @@ function BillsRepo.listActiveForMachine(machineUuid)
     return MySQL.query.await([[
         SELECT `bill_id`, `machine_uuid`, `recipe_id`, `mode`, `primary_output`,
                `target_quantity`, `produced_quantity`, `enabled`, `status`,
-               `block_reason`, `block_detail`, `priority`, `created_by_type`,
-               `created_by_id`, `created_sequence`, `version`
+               `block_reason`, `block_detail`, `priority`, `until_threshold`,
+               `created_by_type`, `created_by_id`, `created_sequence`, `version`
         FROM `czcraft_bills`
         WHERE `machine_uuid` = ? AND `status` IN ('PENDING', 'ACTIVE', 'PAUSED')
         ORDER BY `created_sequence` ASC
@@ -53,7 +53,8 @@ end
 -- Creates a new bill. The bill_id is a caller-generated UUID.
 -- @param params table {
 --   bill_id, machine_uuid, recipe_id, mode, primary_output,
---   target_quantity, priority, created_by_type, created_by_id,
+--   target_quantity, priority, until_threshold? (required for UNTIL_X),
+--   created_by_type, created_by_id,
 -- }
 -- @return boolean ok
 -- @return string|nil error
@@ -62,8 +63,8 @@ function BillsRepo.create(params)
         INSERT INTO `czcraft_bills`
             (`bill_id`, `machine_uuid`, `recipe_id`, `mode`, `primary_output`,
              `target_quantity`, `produced_quantity`, `enabled`, `status`,
-             `priority`, `created_by_type`, `created_by_id`)
-        VALUES (?, ?, ?, ?, ?, ?, 0, 1, 'PENDING', ?, ?, ?)
+             `priority`, `until_threshold`, `created_by_type`, `created_by_id`)
+        VALUES (?, ?, ?, ?, ?, ?, 0, 1, 'PENDING', ?, ?, ?, ?)
     ]], {
         params.bill_id,
         params.machine_uuid,
@@ -72,6 +73,7 @@ function BillsRepo.create(params)
         params.primary_output,
         params.target_quantity,
         params.priority or 'NORMAL',
+        params.until_threshold,
         params.created_by_type,
         params.created_by_id,
     })
@@ -160,7 +162,9 @@ function BillsRepo.incrementProduced(billId, expectedVersion, batchOutputAmount,
         end
         return true, nil
     else
-        -- MAINTAIN_X: just increment produced (for accounting), don't complete.
+        -- MAINTAIN_X / UNTIL_X: stock-based modes never auto-complete (they
+        -- restart while stock + reserved is below the target/threshold). Just
+        -- increment produced for accounting.
         local affected = MySQL.update.await([[
             UPDATE `czcraft_bills`
             SET `produced_quantity` = `produced_quantity` + ?,

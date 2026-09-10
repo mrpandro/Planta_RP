@@ -46,9 +46,13 @@ dofile("resources/[meus-scripts]/qb-czcraft/shared/constants.lua")
 dofile("resources/[meus-scripts]/qb-czcraft/config/general.lua")
 dofile("resources/[meus-scripts]/qb-czcraft/config/machines.lua")
 dofile("resources/[meus-scripts]/qb-czcraft/config/recipes.lua")
+dofile("resources/[meus-scripts]/qb-czcraft/config/balance.lua")
 dofile("resources/[meus-scripts]/qb-czcraft/shared/recipe_snapshot.lua")
 dofile("resources/[meus-scripts]/qb-czcraft/server/domain/bills.lua")
 dofile("resources/[meus-scripts]/qb-czcraft/server/domain/production.lua")
+dofile("resources/[meus-scripts]/qb-czcraft/server/domain/power.lua")
+dofile("resources/[meus-scripts]/qb-czcraft/server/domain/condition.lua")
+dofile("resources/[meus-scripts]/qb-czcraft/server/domain/upgrades.lua")
 dofile("resources/[meus-scripts]/qb-czcraft/server/domain/catchup.lua")
 dofile("resources/[meus-scripts]/qb-czcraft/server/domain/storage.lua")
 
@@ -125,6 +129,7 @@ local function makeMockRepos()
                 row.reserved_quantity = math.max(0, row.reserved_quantity + (delta.reserved_delta or 0))
                 state.stock[delta.item_name] = row
             end
+            -- Power was consumed at START, not here.
             state.activeCycle = nil
             state.machine.operational_status = 'STOPPED'
             state.machine.active_cycle_id = nil
@@ -140,6 +145,15 @@ local function makeMockRepos()
                 row.reserved_quantity = math.max(0, row.reserved_quantity + (delta.reserved_delta or 0))
                 state.stock[delta.item_name] = row
             end
+            -- Power is consumed at START (invariant: energy consumed at cycle
+            -- start, same transaction as inputs).
+            if params.power_to_consume and params.power_to_consume > 0 then
+                state.machine.power_level = math.max(0, (state.machine.power_level or 0) - params.power_to_consume)
+            end
+            -- Condition wear is applied at START (same invariant).
+            if params.wear_to_apply and params.wear_to_apply > 0 then
+                state.machine.condition = math.max(0, (state.machine.condition or 0) - params.wear_to_apply)
+            end
             state.activeCycle = {
                 cycle_id = params.cycle_id,
                 cycle_sequence = params.cycle_sequence,
@@ -149,6 +163,12 @@ local function makeMockRepos()
                 started_at = os.date('!%Y-%m-%d %H:%M:%S.000', params.started_at),
                 due_at = os.date('!%Y-%m-%d %H:%M:%S.000', params.started_at + params.duration_seconds),
                 duration_seconds = params.duration_seconds,
+                power_level_before = params.power_level_before,
+                power_level_after = params.power_level_after,
+                power_to_consume = params.power_to_consume,
+                condition_before = params.condition_before,
+                condition_after = params.condition_after,
+                wear_to_apply = params.wear_to_apply,
             }
             state.machine.operational_status = 'RUNNING'
             state.machine.active_cycle_id = params.cycle_id
@@ -181,6 +201,14 @@ local function makeMockRepos()
             state.machine.next_due_at = os.date('!%Y-%m-%d %H:%M:%S.000', params.next_due_at)
             state.machine.operational_status = 'STOPPED'
             state.machine.active_cycle_id = nil
+            -- Apply power consumption for the chunk.
+            if params.power_to_consume and params.power_to_consume > 0 then
+                state.machine.power_level = math.max(0, (state.machine.power_level or 0) - params.power_to_consume)
+            end
+            -- Apply condition wear for the chunk.
+            if params.wear_to_apply and params.wear_to_apply > 0 then
+                state.machine.condition = math.max(0, (state.machine.condition or 0) - params.wear_to_apply)
+            end
             state.machine.version = (state.machine.version or 0) + 1
             state.events[#state.events + 1] = { cycles = params.cycles_to_run, key = params.idempotency_key }
             return true, nil
@@ -246,6 +274,9 @@ local function assertEqual(actual, expected, message)
 end
 local function assertTrue(value, message)
     if not value then error(message or "Expected truthy") end
+end
+local function assertFalse(value, message)
+    if value then error(message or "Expected falsy") end
 end
 local function assertContains(haystack, needle, message)
     if type(haystack) ~= 'string' or string.find(haystack, needle, 1, true) == nil then
@@ -442,6 +473,426 @@ return {
 
             assertEqual(countCalls(state, 'applyCatchUpChunk'), 0, "no chunks (no bill)")
             assertTrue(countCalls(state, 'clearNextDue') >= 1, "machine goes idle")
+        end,
+    },
+    -- =========================================================================
+    -- v0.2: power gating and consumption
+    -- =========================================================================
+    {
+        name = "Power: Mode 1 completion does NOT consume power (already consumed at start)",
+        test = function()
+            local state, MR, CR, BR, SR, ST = makeMockRepos()
+            -- Power was already consumed at START: 100 - 5 = 95. The machine
+            -- is at 95 while the cycle is active.
+            state.machine = {
+                machine_uuid = 'p1', machine_type = 'refinery', lifecycle = 'INSTALLED',
+                operational_status = 'RUNNING', version = 1, power_level = 95,
+                next_due_at = os.date('!%Y-%m-%d %H:%M:%S.000', FIXED_NOW - 100),
+            }
+            state.activeCycle = {
+                cycle_id = 'pc1', cycle_sequence = 1, machine_uuid = 'p1',
+                bill_id = 'pb1', recipe_id = 'smelt_steel',
+                started_at = os.date('!%Y-%m-%d %H:%M:%S.000', FIXED_NOW - 160),
+                due_at = os.date('!%Y-%m-%d %H:%M:%S.000', FIXED_NOW - 100),
+                duration_seconds = 60,
+                power_level_before = 100, power_level_after = 95, power_to_consume = 5,
+            }
+            state.stock = {
+                iron = { quantity = 100, reserved_quantity = 0 },
+                metalscrap = { quantity = 50, reserved_quantity = 0 },
+                steel = { quantity = 0, reserved_quantity = 2 },
+            }
+            state.bills = {
+                pb1 = {
+                    bill_id = 'pb1', machine_uuid = 'p1', recipe_id = 'smelt_steel',
+                    mode = 'PRODUCE_X', primary_output = 'steel',
+                    target_quantity = 100, produced_quantity = 0,
+                    enabled = true, status = 'ACTIVE', priority = 'NORMAL',
+                    created_sequence = 1, version = 1,
+                },
+            }
+            local engine = loadEngine(state, MR, CR, BR, SR, ST)
+            engine.processMachine('p1')
+
+            -- Completion does NOT touch power (stays 95). The next cycle
+            -- start consumes 5 more: 95 - 5 = 90.
+            assertEqual(state.machine.power_level, 90, "power consumed at next start (95 -> 90), not at completion")
+            assertTrue(countCalls(state, 'start') == 1, "next cycle started")
+        end,
+    },
+    {
+        name = "Power: low power blocks new cycle start after completion",
+        test = function()
+            local state, MR, CR, BR, SR, ST = makeMockRepos()
+            -- Power was already consumed at START: 6 - 5 = 1. The machine
+            -- is at 1 while the cycle is active (below blockThreshold 5).
+            state.machine = {
+                machine_uuid = 'p2', machine_type = 'refinery', lifecycle = 'INSTALLED',
+                operational_status = 'RUNNING', version = 1, power_level = 1,
+                next_due_at = os.date('!%Y-%m-%d %H:%M:%S.000', FIXED_NOW - 100),
+            }
+            state.activeCycle = {
+                cycle_id = 'pc2', cycle_sequence = 2, machine_uuid = 'p2',
+                bill_id = 'pb2', recipe_id = 'smelt_steel',
+                started_at = os.date('!%Y-%m-%d %H:%M:%S.000', FIXED_NOW - 160),
+                due_at = os.date('!%Y-%m-%d %H:%M:%S.000', FIXED_NOW - 100),
+                duration_seconds = 60,
+                power_level_before = 6, power_level_after = 1, power_to_consume = 5,
+            }
+            state.stock = {
+                iron = { quantity = 100, reserved_quantity = 0 },
+                metalscrap = { quantity = 50, reserved_quantity = 0 },
+                steel = { quantity = 0, reserved_quantity = 2 },
+            }
+            state.bills = {
+                pb2 = {
+                    bill_id = 'pb2', machine_uuid = 'p2', recipe_id = 'smelt_steel',
+                    mode = 'PRODUCE_X', primary_output = 'steel',
+                    target_quantity = 100, produced_quantity = 0,
+                    enabled = true, status = 'ACTIVE', priority = 'NORMAL',
+                    created_sequence = 1, version = 1,
+                },
+            }
+            local engine = loadEngine(state, MR, CR, BR, SR, ST)
+            engine.processMachine('p2')
+
+            -- Completion does NOT touch power (stays 1). Next cycle start
+            -- is blocked (1 < blockThreshold 5).
+            assertEqual(state.machine.power_level, 1, "power unchanged by completion (stays 1)")
+            assertEqual(countCalls(state, 'start'), 0, "no next cycle (power blocked)")
+            assertTrue(countCalls(state, 'setBlocked') >= 1, "machine set blocked")
+            local blockCall = nil
+            for _, c in ipairs(state.calls) do
+                if c.name == 'setBlocked' then blockCall = c break end
+            end
+            assertContains(blockCall.args.reason, 'power', "block reason mentions power")
+        end,
+    },
+    {
+        name = "Power: Mode 2 catch-up consumes power per cycle",
+        test = function()
+            local state, MR, CR, BR, SR, ST = makeMockRepos()
+            state.machine = {
+                machine_uuid = 'p3', machine_type = 'refinery', lifecycle = 'INSTALLED',
+                operational_status = 'STOPPED', version = 1, power_level = 100,
+                next_due_at = os.date('!%Y-%m-%d %H:%M:%S.000', FIXED_NOW - 600),
+            }
+            state.stock = {
+                iron = { quantity = 1000, reserved_quantity = 0 },
+                metalscrap = { quantity = 500, reserved_quantity = 0 },
+                steel = { quantity = 0, reserved_quantity = 0 },
+            }
+            state.bills = {
+                pb3 = {
+                    bill_id = 'pb3', machine_uuid = 'p3', recipe_id = 'smelt_steel',
+                    mode = 'PRODUCE_X', primary_output = 'steel',
+                    target_quantity = 20, produced_quantity = 0,
+                    enabled = true, status = 'ACTIVE', priority = 'NORMAL',
+                    created_sequence = 1, version = 1,
+                },
+            }
+            local engine = loadEngine(state, MR, CR, BR, SR, ST)
+            engine.processMachine('p3')
+
+            -- 10 cycles * 5 power = 50 consumed. 100 - 50 = 50.
+            assertEqual(state.machine.power_level, 50, "10 cycles consumed 50 power (100 -> 50)")
+        end,
+    },
+    {
+        name = "Power: Mode 2 catch-up bounded by available power",
+        test = function()
+            local state, MR, CR, BR, SR, ST = makeMockRepos()
+            -- Only 12 power -> floor(12/5) = 2 cycles max (10s elapsed allows 10).
+            state.machine = {
+                machine_uuid = 'p4', machine_type = 'refinery', lifecycle = 'INSTALLED',
+                operational_status = 'STOPPED', version = 1, power_level = 12,
+                next_due_at = os.date('!%Y-%m-%d %H:%M:%S.000', FIXED_NOW - 600),
+            }
+            state.stock = {
+                iron = { quantity = 1000, reserved_quantity = 0 },
+                metalscrap = { quantity = 500, reserved_quantity = 0 },
+                steel = { quantity = 0, reserved_quantity = 0 },
+            }
+            state.bills = {
+                pb4 = {
+                    bill_id = 'pb4', machine_uuid = 'p4', recipe_id = 'smelt_steel',
+                    mode = 'MAINTAIN_X', primary_output = 'steel',
+                    target_quantity = 100, produced_quantity = 0,
+                    enabled = true, status = 'ACTIVE', priority = 'NORMAL',
+                    created_sequence = 1, version = 1,
+                },
+            }
+            local engine = loadEngine(state, MR, CR, BR, SR, ST)
+            engine.processMachine('p4')
+
+            -- Only 2 cycles ran (12 power / 5 per cycle = 2.4 -> floor 2).
+            -- Power after: 12 - (2 * 5) = 2.
+            assertEqual(state.machine.power_level, 2, "2 cycles consumed 10 power (12 -> 2)")
+            -- Steel produced: 2 cycles * 2 = 4.
+            assertEqual(state.stock.steel.quantity, 4, "only 4 steel produced (power-bounded)")
+        end,
+    },
+    {
+        name = "Power: catch-up blocked when power below threshold",
+        test = function()
+            local state, MR, CR, BR, SR, ST = makeMockRepos()
+            -- Power = 3 (below blockThreshold 5) -> no catch-up cycles.
+            state.machine = {
+                machine_uuid = 'p5', machine_type = 'refinery', lifecycle = 'INSTALLED',
+                operational_status = 'STOPPED', version = 1, power_level = 3,
+                next_due_at = os.date('!%Y-%m-%d %H:%M:%S.000', FIXED_NOW - 600),
+            }
+            state.stock = {
+                iron = { quantity = 1000, reserved_quantity = 0 },
+                metalscrap = { quantity = 500, reserved_quantity = 0 },
+            }
+            state.bills = {
+                pb5 = {
+                    bill_id = 'pb5', machine_uuid = 'p5', recipe_id = 'smelt_steel',
+                    mode = 'MAINTAIN_X', primary_output = 'steel',
+                    target_quantity = 100, produced_quantity = 0,
+                    enabled = true, status = 'ACTIVE', priority = 'NORMAL',
+                    created_sequence = 1, version = 1,
+                },
+            }
+            local engine = loadEngine(state, MR, CR, BR, SR, ST)
+            engine.processMachine('p5')
+
+            assertEqual(countCalls(state, 'applyCatchUpChunk'), 0, "no chunks (power blocked)")
+            assertTrue(countCalls(state, 'setBlocked') >= 1, "machine set blocked")
+            local blockCall = nil
+            for _, c in ipairs(state.calls) do
+                if c.name == 'setBlocked' then blockCall = c break end
+            end
+            assertContains(blockCall.args.reason, 'power', "block reason mentions power")
+        end,
+    },
+    {
+        name = "Power: no power_level (nil) skips power gate (backward compat)",
+        test = function()
+            local state, MR, CR, BR, SR, ST = makeMockRepos()
+            -- No power_level on the machine (schema v1 / old test mocks).
+            state.machine = {
+                machine_uuid = 'p6', machine_type = 'refinery', lifecycle = 'INSTALLED',
+                operational_status = 'STOPPED', version = 1,
+                next_due_at = os.date('!%Y-%m-%d %H:%M:%S.000', FIXED_NOW - 600),
+            }
+            state.stock = {
+                iron = { quantity = 1000, reserved_quantity = 0 },
+                metalscrap = { quantity = 500, reserved_quantity = 0 },
+                steel = { quantity = 0, reserved_quantity = 0 },
+            }
+            state.bills = {
+                pb6 = {
+                    bill_id = 'pb6', machine_uuid = 'p6', recipe_id = 'smelt_steel',
+                    mode = 'PRODUCE_X', primary_output = 'steel',
+                    target_quantity = 20, produced_quantity = 0,
+                    enabled = true, status = 'ACTIVE', priority = 'NORMAL',
+                    created_sequence = 1, version = 1,
+                },
+            }
+            local engine = loadEngine(state, MR, CR, BR, SR, ST)
+            engine.processMachine('p6')
+
+            -- Catch-up runs normally (no power gating when power_level is nil).
+            assertTrue(countCalls(state, 'applyCatchUpChunk') >= 1, "catch-up runs without power_level")
+            -- No power-related block.
+            local hasPowerBlock = false
+            for _, c in ipairs(state.calls) do
+                if c.name == 'setBlocked' and string.find(c.args.reason, 'power', 1, true) then
+                    hasPowerBlock = true
+                    break
+                end
+            end
+            assertFalse(hasPowerBlock, "no power block when power_level is nil")
+        end,
+    },
+
+    -- =========================================================================
+    -- v0.2: condition gating and wear
+    -- =========================================================================
+    {
+        name = "Condition: catch-up + real-time start applies wear (100 -> 99.0)",
+        test = function()
+            local state, MR, CR, BR, SR, ST = makeMockRepos()
+            state.machine = {
+                machine_uuid = 'c1', machine_type = 'refinery', lifecycle = 'INSTALLED',
+                operational_status = 'STOPPED', version = 1, power_level = 100,
+                condition = 100,
+                next_due_at = os.date('!%Y-%m-%d %H:%M:%S.000', FIXED_NOW - 100),
+            }
+            state.stock = {
+                iron = { quantity = 100, reserved_quantity = 0 },
+                metalscrap = { quantity = 50, reserved_quantity = 0 },
+            }
+            state.bills = {
+                cb1 = {
+                    bill_id = 'cb1', machine_uuid = 'c1', recipe_id = 'smelt_steel',
+                    mode = 'PRODUCE_X', primary_output = 'steel',
+                    target_quantity = 100, produced_quantity = 0,
+                    enabled = true, status = 'ACTIVE', priority = 'NORMAL',
+                    created_sequence = 1, version = 1,
+                },
+            }
+            local engine = loadEngine(state, MR, CR, BR, SR, ST)
+            engine.processMachine('c1')
+
+            -- Catch-up runs 1 cycle (100s / 60s = 1), applying 0.5 wear.
+            -- Then a real-time cycle starts, applying another 0.5 wear.
+            -- Total: 100 - 1.0 = 99.0. Wear is applied at START, not completion.
+            assertEqual(state.machine.condition, 99.0, "wear applied at start (catch-up + real-time = 100 -> 99.0)")
+            assertTrue(countCalls(state, 'start') == 1, "real-time cycle started")
+        end,
+    },
+    {
+        name = "Condition: low condition blocks new cycle start",
+        test = function()
+            local state, MR, CR, BR, SR, ST = makeMockRepos()
+            state.machine = {
+                machine_uuid = 'c2', machine_type = 'refinery', lifecycle = 'INSTALLED',
+                operational_status = 'STOPPED', version = 1, power_level = 100,
+                condition = 20, -- at block threshold
+                next_due_at = os.date('!%Y-%m-%d %H:%M:%S.000', FIXED_NOW - 100),
+            }
+            state.stock = {
+                iron = { quantity = 100, reserved_quantity = 0 },
+                metalscrap = { quantity = 50, reserved_quantity = 0 },
+            }
+            state.bills = {
+                cb2 = {
+                    bill_id = 'cb2', machine_uuid = 'c2', recipe_id = 'smelt_steel',
+                    mode = 'PRODUCE_X', primary_output = 'steel',
+                    target_quantity = 100, produced_quantity = 0,
+                    enabled = true, status = 'ACTIVE', priority = 'NORMAL',
+                    created_sequence = 1, version = 1,
+                },
+            }
+            local engine = loadEngine(state, MR, CR, BR, SR, ST)
+            engine.processMachine('c2')
+
+            -- No cycle started (condition at block threshold).
+            assertEqual(countCalls(state, 'start'), 0, "no cycle (condition blocked)")
+            assertTrue(countCalls(state, 'setBlocked') >= 1, "machine set blocked")
+            local blockCall = nil
+            for _, c in ipairs(state.calls) do
+                if c.name == 'setBlocked' then blockCall = c break end
+            end
+            assertContains(blockCall.args.reason, 'condition', "block reason mentions condition")
+            -- Condition unchanged (no wear applied).
+            assertEqual(state.machine.condition, 20, "condition unchanged (no wear)")
+        end,
+    },
+    {
+        name = "Condition: Mode 2 catch-up applies wear per cycle",
+        test = function()
+            local state, MR, CR, BR, SR, ST = makeMockRepos()
+            state.machine = {
+                machine_uuid = 'c3', machine_type = 'refinery', lifecycle = 'INSTALLED',
+                operational_status = 'STOPPED', version = 1, power_level = 100,
+                condition = 100,
+                next_due_at = os.date('!%Y-%m-%d %H:%M:%S.000', FIXED_NOW - 600),
+            }
+            state.stock = {
+                iron = { quantity = 1000, reserved_quantity = 0 },
+                metalscrap = { quantity = 500, reserved_quantity = 0 },
+                steel = { quantity = 0, reserved_quantity = 0 },
+            }
+            state.bills = {
+                cb3 = {
+                    bill_id = 'cb3', machine_uuid = 'c3', recipe_id = 'smelt_steel',
+                    mode = 'PRODUCE_X', primary_output = 'steel',
+                    target_quantity = 20, produced_quantity = 0,
+                    enabled = true, status = 'ACTIVE', priority = 'NORMAL',
+                    created_sequence = 1, version = 1,
+                },
+            }
+            local engine = loadEngine(state, MR, CR, BR, SR, ST)
+            engine.processMachine('c3')
+
+            -- 10 cycles * 0.5 wear = 5. 100 - 5 = 95.
+            assertEqual(state.machine.condition, 95, "10 cycles consumed 5 condition (100 -> 95)")
+        end,
+    },
+    {
+        name = "Condition: catch-up bounded by available condition",
+        test = function()
+            local state, MR, CR, BR, SR, ST = makeMockRepos()
+            -- Condition at 25, blockThreshold 20. Available: (25 - 20) / 0.5 = 10 cycles.
+            state.machine = {
+                machine_uuid = 'c4', machine_type = 'refinery', lifecycle = 'INSTALLED',
+                operational_status = 'STOPPED', version = 1, power_level = 100,
+                condition = 25,
+                next_due_at = os.date('!%Y-%m-%d %H:%M:%S.000', FIXED_NOW - 6000),
+            }
+            -- Keep stock within the refinery's 250kg capacity. Iron at 100g/ea:
+            -- 200 iron = 20kg, 100 metalscrap = 5kg. Total 25kg << 250kg.
+            state.stock = {
+                iron = { quantity = 200, reserved_quantity = 0 },
+                metalscrap = { quantity = 100, reserved_quantity = 0 },
+                steel = { quantity = 0, reserved_quantity = 0 },
+            }
+            state.bills = {
+                cb4 = {
+                    bill_id = 'cb4', machine_uuid = 'c4', recipe_id = 'smelt_steel',
+                    mode = 'PRODUCE_X', primary_output = 'steel',
+                    target_quantity = 200, produced_quantity = 0,
+                    enabled = true, status = 'ACTIVE', priority = 'NORMAL',
+                    created_sequence = 1, version = 1,
+                },
+            }
+            local engine = loadEngine(state, MR, CR, BR, SR, ST)
+            engine.processMachine('c4')
+
+            -- Only 10 cycles of wear before hitting block threshold.
+            -- 25 - (10 * 0.5) = 20 (at block threshold).
+            assertEqual(state.machine.condition, 20, "condition bounded at block threshold (25 -> 20)")
+            -- The machine should be blocked after catch-up (condition low).
+            local hasConditionBlock = false
+            for _, c in ipairs(state.calls) do
+                if c.name == 'setBlocked' and string.find(c.args.reason, 'condition', 1, true) then
+                    hasConditionBlock = true
+                    break
+                end
+            end
+            assertTrue(hasConditionBlock, "machine blocked on condition after catch-up")
+        end,
+    },
+    {
+        name = "Condition: nil condition skips condition gate (schema v1 compat)",
+        test = function()
+            local state, MR, CR, BR, SR, ST = makeMockRepos()
+            state.machine = {
+                machine_uuid = 'c5', machine_type = 'refinery', lifecycle = 'INSTALLED',
+                operational_status = 'STOPPED', version = 1, power_level = 100,
+                -- No condition field (schema v1 / test mock).
+                next_due_at = os.date('!%Y-%m-%d %H:%M:%S.000', FIXED_NOW - 100),
+            }
+            state.stock = {
+                iron = { quantity = 100, reserved_quantity = 0 },
+                metalscrap = { quantity = 50, reserved_quantity = 0 },
+            }
+            state.bills = {
+                cb5 = {
+                    bill_id = 'cb5', machine_uuid = 'c5', recipe_id = 'smelt_steel',
+                    mode = 'PRODUCE_X', primary_output = 'steel',
+                    target_quantity = 100, produced_quantity = 0,
+                    enabled = true, status = 'ACTIVE', priority = 'NORMAL',
+                    created_sequence = 1, version = 1,
+                },
+            }
+            local engine = loadEngine(state, MR, CR, BR, SR, ST)
+            engine.processMachine('c5')
+
+            -- Cycle starts normally (no condition gating when condition is nil).
+            assertTrue(countCalls(state, 'start') == 1, "cycle starts without condition")
+            local hasConditionBlock = false
+            for _, c in ipairs(state.calls) do
+                if c.name == 'setBlocked' and string.find(c.args.reason, 'condition', 1, true) then
+                    hasConditionBlock = true
+                    break
+                end
+            end
+            assertFalse(hasConditionBlock, "no condition block when condition is nil")
         end,
     },
 }

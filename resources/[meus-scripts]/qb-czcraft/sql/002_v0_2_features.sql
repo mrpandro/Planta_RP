@@ -15,19 +15,19 @@
 
 -- ---------------------------------------------------------------------------
 -- czcraft_machines: add condition, power, and upgrade columns.
--- Condition and power are on a 0-100 scale (SMALLINT to avoid TINYINT
--- range limits if future tuning exceeds 255). Upgrade levels are per-track
--- TINYINT; budget_used tracks total points spent across all tracks.
+-- Condition is DECIMAL(5,2) to support fractional wear (e.g. 0.5/cycle); power
+-- is SMALLINT UNSIGNED (whole units). Upgrade levels are per-track TINYINT;
+-- budget_used tracks total points spent across all tracks.
 -- ---------------------------------------------------------------------------
 ALTER TABLE `czcraft_machines`
-    ADD COLUMN `condition`             SMALLINT UNSIGNED NOT NULL DEFAULT 100,
+    ADD COLUMN `condition`             DECIMAL(5,2) NOT NULL DEFAULT 100.00,
     ADD COLUMN `power_level`           SMALLINT UNSIGNED NOT NULL DEFAULT 100,
     ADD COLUMN `upgrade_speed_level`     TINYINT UNSIGNED NOT NULL DEFAULT 0,
     ADD COLUMN `upgrade_capacity_level`  TINYINT UNSIGNED NOT NULL DEFAULT 0,
     ADD COLUMN `upgrade_efficiency_level` TINYINT UNSIGNED NOT NULL DEFAULT 0,
     ADD COLUMN `upgrade_durability_level` TINYINT UNSIGNED NOT NULL DEFAULT 0,
     ADD COLUMN `upgrade_budget_used`    TINYINT UNSIGNED NOT NULL DEFAULT 0,
-    ADD CONSTRAINT `chk_machines_condition` CHECK (`condition` <= 100),
+    ADD CONSTRAINT `chk_machines_condition` CHECK (`condition` <= 100.00),
     ADD CONSTRAINT `chk_machines_power` CHECK (`power_level` <= 100);
 
 -- ---------------------------------------------------------------------------
@@ -54,8 +54,8 @@ ALTER TABLE `czcraft_bills`
 -- apply deterministic effects without re-reading the machine row.
 -- ---------------------------------------------------------------------------
 ALTER TABLE `czcraft_active_cycles`
-    ADD COLUMN `condition_before`   TINYINT UNSIGNED DEFAULT NULL,
-    ADD COLUMN `condition_after`    TINYINT UNSIGNED DEFAULT NULL,
+    ADD COLUMN `condition_before`   DECIMAL(5,2) DEFAULT NULL,
+    ADD COLUMN `condition_after`    DECIMAL(5,2) DEFAULT NULL,
     ADD COLUMN `power_level_before` SMALLINT UNSIGNED DEFAULT NULL,
     ADD COLUMN `power_level_after`  SMALLINT UNSIGNED DEFAULT NULL,
     ADD COLUMN `wear_to_apply`      DECIMAL(5,2) NOT NULL DEFAULT 0.00,
@@ -66,8 +66,8 @@ ALTER TABLE `czcraft_active_cycles`
 -- aggregated event records the machine state transition it caused.
 -- ---------------------------------------------------------------------------
 ALTER TABLE `czcraft_production_events`
-    ADD COLUMN `condition_before`   TINYINT UNSIGNED DEFAULT NULL,
-    ADD COLUMN `condition_after`    TINYINT UNSIGNED DEFAULT NULL,
+    ADD COLUMN `condition_before`   DECIMAL(5,2) DEFAULT NULL,
+    ADD COLUMN `condition_after`    DECIMAL(5,2) DEFAULT NULL,
     ADD COLUMN `power_level_before` SMALLINT UNSIGNED DEFAULT NULL,
     ADD COLUMN `power_level_after`  SMALLINT UNSIGNED DEFAULT NULL,
     ADD COLUMN `wear_applied`       DECIMAL(5,2) DEFAULT 0.00,
@@ -79,6 +79,16 @@ ALTER TABLE `czcraft_production_events`
 -- export_key prevents double-application on replay. DEBIT = money removed
 -- from the player; CREDIT = money added to the player.
 -- ---------------------------------------------------------------------------
+
+-- Widen bank_statements.reason (owned by qb-banking) so czcraft's structured
+-- reason format "czcraft|<export_key>|<human_reason>" fits. The export_key
+-- can include machine_uuid + bill_id + operation, easily exceeding 50 chars.
+-- VARCHAR(255) is wide enough for any reasonable export_key without being
+-- unbounded. This ALTER is idempotent via information_schema guard in the
+-- applying script; MySQL does not support IF NOT EXISTS on ALTER COLUMN.
+ALTER TABLE `bank_statements`
+    MODIFY COLUMN `reason` VARCHAR(255) DEFAULT NULL;
+
 CREATE TABLE IF NOT EXISTS `czcraft_financial_exports` (
     `export_id`    CHAR(36)         NOT NULL,
     `export_key`   VARCHAR(255)     NOT NULL,
@@ -145,8 +155,8 @@ CREATE TABLE IF NOT EXISTS `czcraft_daily_rollups` (
     `items_consumed`    JSON         NOT NULL,
     `revenue`           DECIMAL(18,4) NOT NULL DEFAULT 0.0000,
     `cost`              DECIMAL(18,4) NOT NULL DEFAULT 0.0000,
-    `condition_start`   TINYINT UNSIGNED DEFAULT NULL,
-    `condition_end`     TINYINT UNSIGNED DEFAULT NULL,
+    `condition_start`   DECIMAL(5,2) DEFAULT NULL,
+    `condition_end`     DECIMAL(5,2) DEFAULT NULL,
     `version`           INT(10) UNSIGNED NOT NULL DEFAULT 0,
     `created_at`        DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `updated_at`        DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),

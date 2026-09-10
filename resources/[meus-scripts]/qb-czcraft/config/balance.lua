@@ -25,10 +25,10 @@ CZCraft.Config.Balance = {
         -- Condition a new machine starts at. New placements and fresh
         -- purchases begin at full condition.
         start = 100,
-        -- Condition lost per completed cycle. At 0.5/cycle with 60s recipes,
-        -- a machine fully degrades after 200 cycles (~3.3h of active
-        -- production). This makes maintenance an occasional chore, not a
-        -- per-session task.
+        -- Condition lost per cycle (at cycle start, same as inputs and
+        -- energy). At 0.5/cycle with 60s recipes, a machine fully degrades
+        -- after 200 cycles (~3.3h of active production). This makes
+        -- maintenance an occasional chore, not a per-session task.
         wearPerCycle = 0.5,
         -- Machine blocks new cycles when condition drops to or below this
         -- threshold. Active cycles finish; no new cycle starts until
@@ -58,9 +58,10 @@ CZCraft.Config.Balance = {
         capacity = 100,
         -- Starting power level for new machines.
         start = 100,
-        -- Energy consumed per completed cycle. At 5/cycle with 60s recipes,
-        -- a full charge lasts 20 cycles (~20 min of active production).
-        -- This makes recharging a planned activity, not a constant chore.
+        -- Energy consumed per cycle (at cycle start, same as inputs). At
+        -- 5/cycle with 60s recipes, a full charge lasts 20 cycles (~20 min
+        -- of active production). This makes recharging a planned activity,
+        -- not a constant chore.
         consumptionPerCycle = 5,
         -- Machine blocks new cycles when power drops below this. Set equal
         -- to consumptionPerCycle so a cycle can always complete once started.

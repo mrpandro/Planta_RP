@@ -183,5 +183,194 @@ function MachinesRepo.clearNextDue(machineUuid, expectedVersion)
     return affected and affected > 0
 end
 
+-- Updates the machine's condition and clears a condition-related block.
+-- Uses optimistic versioning. Called by the maintenance service after
+-- the financial debit succeeds.
+-- @param machineUuid string
+-- @param newCondition number (DECIMAL(5,2), 0-100)
+-- @param expectedVersion number
+-- @return boolean ok
+function MachinesRepo.updateCondition(machineUuid, newCondition, expectedVersion)
+    local affected = MySQL.update.await([[
+        UPDATE `czcraft_machines`
+        SET `condition` = ?,
+            `blocked_reason` = CASE
+                WHEN `blocked_reason` = 'condition low' THEN NULL
+                ELSE `blocked_reason`
+            END,
+            `blocked_detail` = CASE
+                WHEN `blocked_reason` = 'condition low' THEN NULL
+                ELSE `blocked_detail`
+            END,
+            `version` = `version` + 1
+        WHERE `machine_uuid` = ? AND `version` = ?
+    ]], { newCondition, machineUuid, expectedVersion })
+    return affected and affected > 0
+end
+
+-- Increments one upgrade track level and adds the point cost to budget_used.
+-- Uses optimistic versioning. Called by the upgrades service after the
+-- financial debit and item consumption succeed.
+-- @param machineUuid string
+-- @param track string ('speed'|'capacity'|'efficiency'|'durability')
+-- @param pointsCost number (points to add to budget_used)
+-- @param expectedVersion number
+-- @return boolean ok
+function MachinesRepo.upgradeTrack(machineUuid, track, pointsCost, expectedVersion)
+    local column = 'upgrade_' .. track .. '_level'
+    local affected = MySQL.update.await([[
+        UPDATE `czcraft_machines`
+        SET `]] .. column .. [[` = `]] .. column .. [[` + 1,
+            `upgrade_budget_used` = `upgrade_budget_used` + ?,
+            `version` = `version` + 1
+        WHERE `machine_uuid` = ? AND `version` = ?
+    ]], { pointsCost, machineUuid, expectedVersion })
+    return affected and affected > 0
+end
+
+-- Reactivates a PACKED machine row back to INSTALLED with new location/owner.
+-- Preserves condition, upgrade levels, and budget_used from the PACKED row.
+-- Used when a player places a previously-packed machine item that carries
+-- a machine_uuid. The machine must be in PACKED lifecycle and have no
+-- active cycle or stock (validated by the caller before pickup).
+-- @param machineUuid string
+-- @param fields table { owner_type, owner_id, location_type, location_id,
+--                       pos_x, pos_y, pos_z, heading, stock_capacity }
+-- @param expectedVersion number
+-- @return boolean ok
+-- @return string|nil error
+function MachinesRepo.reactivateInstalled(machineUuid, fields, expectedVersion)
+    local affected = MySQL.update.await([[
+        UPDATE `czcraft_machines`
+        SET `lifecycle` = 'INSTALLED',
+            `operational_status` = 'STOPPED',
+            `owner_type` = ?,
+            `owner_id` = ?,
+            `location_type` = ?,
+            `location_id` = ?,
+            `pos_x` = ?,
+            `pos_y` = ?,
+            `pos_z` = ?,
+            `heading` = ?,
+            `stock_capacity` = ?,
+            `next_due_at` = NULL,
+            `blocked_reason` = NULL,
+            `blocked_detail` = NULL,
+            `active_cycle_id` = NULL,
+            `active_bill_id` = NULL,
+            `version` = `version` + 1
+        WHERE `machine_uuid` = ? AND `version` = ? AND `lifecycle` = 'PACKED'
+    ]], {
+        fields.owner_type, fields.owner_id, fields.location_type, fields.location_id,
+        fields.pos_x, fields.pos_y, fields.pos_z, fields.heading,
+        fields.stock_capacity,
+        machineUuid, expectedVersion,
+    })
+    if not affected or affected == 0 then
+        return false, 'machine not found, not PACKED, or version conflict'
+    end
+    return true
+end
+
+-- Loads a PACKED machine row by uuid (for reactivation lookup).
+-- @param machineUuid string
+-- @return table|nil machine
+function MachinesRepo.loadPacked(machineUuid)
+    local row = MySQL.single.await([[
+        SELECT * FROM `czcraft_machines`
+        WHERE `machine_uuid` = ? AND `lifecycle` = 'PACKED'
+    ]], { machineUuid })
+    return row
+end
+
+-- Decrements one upgrade track level. Budget points are NOT refunded
+-- (per v0.2 design: "Points are spent permanently"). Uses optimistic
+-- versioning. Called by the upgrades service after validateDowngrade passes.
+-- @param machineUuid string
+-- @param track string ('speed'|'capacity'|'efficiency'|'durability')
+-- @param expectedVersion number
+-- @return boolean ok
+function MachinesRepo.downgradeTrack(machineUuid, track, expectedVersion)
+    local column = 'upgrade_' .. track .. '_level'
+    local affected = MySQL.update.await([[
+        UPDATE `czcraft_machines`
+        SET `]] .. column .. [[` = GREATEST(0, `]] .. column .. [[` - 1),
+            `version` = `version` + 1
+        WHERE `machine_uuid` = ? AND `version` = ? AND `]] .. column .. [[` > 0
+    ]], { machineUuid, expectedVersion })
+    return affected and affected > 0
+end
+
+-- Transfers all INSTALLED machines at a house to a new owner. Called when a
+-- house is sold/transferred via qb-phone:server:TransferCid. The caller fires
+-- the `qb-czcraft:server:houseTransferred` event after the qb-houses transfer
+-- completes.
+--
+-- Per decisions.md: "Imóvel transferido: Máquina, stock, bills e ciclo
+-- passam ao novo dono da casa." Machines, stock, bills, and active cycles
+-- all stay with the machine (tied by machine_uuid) — only owner_id changes.
+-- An active cycle continues under the new owner. A condition-blocked machine
+-- stays blocked (the new owner can perform maintenance).
+--
+-- @param houseId string
+-- @param newOwnerCid string (new house owner's citizenid)
+-- @return number count of machines transferred
+function MachinesRepo.transferHouseMachines(houseId, newOwnerCid)
+    local affected = MySQL.update.await([[
+        UPDATE `czcraft_machines`
+        SET `owner_id` = ?,
+            `version` = `version` + 1
+        WHERE `location_type` = 'HOUSE'
+          AND `location_id` = ?
+          AND `lifecycle` = 'INSTALLED'
+    ]], { newOwnerCid, houseId })
+    return affected or 0
+end
+
+-- Startup reconciliation: finds INSTALLED machines at HOUSE locations whose
+-- owner_id doesn't match the current house owner in player_houses, and
+-- reassigns them. Called at resource start after the schema gate passes.
+--
+-- This closes the crash-window gap documented in risks.md: "House transfer
+-- de ativos não pode ser perfeitamente atómico sem acoplar SQL de houses ao
+-- czcraft; hook + operation journal + startup reconciliation tornam o
+-- resultado convergente e observável." If the server crashes between the
+-- player_houses UPDATE and transferHouseMachines completing, machines are
+-- left with a stale owner_id. This pass fixes them at the next startup.
+--
+-- Only touches owner_id and version — preserves condition, upgrades, active
+-- cycles, block state, and all other machine columns.
+--
+-- @return number count of machines reconciled
+-- @return table list of { machine_uuid, old_owner, new_owner } for audit
+function MachinesRepo.reconcileHouseMachineOwners()
+    -- Step 1: find mismatched machines (for audit before mutating).
+    local mismatches = MySQL.query.await([[
+        SELECT m.`machine_uuid`, m.`owner_id` AS old_owner, ph.`citizenid` AS new_owner
+        FROM `czcraft_machines` m
+        INNER JOIN `player_houses` ph ON m.`location_id` = ph.`house`
+        WHERE m.`lifecycle` = 'INSTALLED'
+          AND m.`location_type` = 'HOUSE'
+          AND (m.`owner_id` IS NULL OR m.`owner_id` <> ph.`citizenid`)
+    ]]) or {}
+
+    if #mismatches == 0 then
+        return 0, {}
+    end
+
+    -- Step 2: update all mismatched machines in a single atomic UPDATE.
+    local affected = MySQL.update.await([[
+        UPDATE `czcraft_machines` m
+        INNER JOIN `player_houses` ph ON m.`location_id` = ph.`house`
+        SET m.`owner_id` = ph.`citizenid`,
+            m.`version` = m.`version` + 1
+        WHERE m.`lifecycle` = 'INSTALLED'
+          AND m.`location_type` = 'HOUSE'
+          AND (m.`owner_id` IS NULL OR m.`owner_id` <> ph.`citizenid`)
+    ]]) or 0
+
+    return affected, mismatches
+end
+
 CZCraft.MachinesRepo = MachinesRepo
 return MachinesRepo

@@ -205,19 +205,49 @@ local function commitPlacement(source, params)
     end
     CZCraft.OperationsRepo.markStep(opId, 'INVENTORY_APPLIED', 'COMPLETED', { replayed = removeResult.replayed })
 
-    -- Step 2: create the machine record.
-    local machineUuid, createError = CZCraft.MachinesRepo.createInstalled({
-        machine_type = machineConfig.type,
-        owner_type = ownerRef.type,
-        owner_id = ownerRef.id,
-        location_type = validation.location.type,
-        location_id = validation.location.id,
-        pos_x = transform.pos_x,
-        pos_y = transform.pos_y,
-        pos_z = transform.pos_z,
-        heading = transform.heading,
-        stock_capacity = machineConfig.stockCapacity,
-    })
+    -- Step 2: create or reactivate the machine record.
+    -- If the item carries a machine_uuid from a previous pickup, reactivate
+    -- the existing PACKED row (preserves condition + upgrade levels). Otherwise,
+    -- create a new machine row with defaults.
+    local machineUuid, createError
+    local existingUuid = item.info and item.info.machine_uuid
+    local packedMachine = existingUuid and CZCraft.MachinesRepo.loadPacked(existingUuid) or nil
+
+    if packedMachine then
+        local reactivateOk, reactivateErr = CZCraft.MachinesRepo.reactivateInstalled(
+            existingUuid,
+            {
+                owner_type = ownerRef.type,
+                owner_id = ownerRef.id,
+                location_type = validation.location.type,
+                location_id = validation.location.id,
+                pos_x = transform.pos_x,
+                pos_y = transform.pos_y,
+                pos_z = transform.pos_z,
+                heading = transform.heading,
+                stock_capacity = machineConfig.stockCapacity,
+            },
+            tonumber(packedMachine.version) or 0
+        )
+        if not reactivateOk then
+            createError = reactivateErr
+        else
+            machineUuid = existingUuid
+        end
+    else
+        machineUuid, createError = CZCraft.MachinesRepo.createInstalled({
+            machine_type = machineConfig.type,
+            owner_type = ownerRef.type,
+            owner_id = ownerRef.id,
+            location_type = validation.location.type,
+            location_id = validation.location.id,
+            pos_x = transform.pos_x,
+            pos_y = transform.pos_y,
+            pos_z = transform.pos_z,
+            heading = transform.heading,
+            stock_capacity = machineConfig.stockCapacity,
+        })
+    end
 
     if not machineUuid then
         -- Compensate: restore the item via the journal.
@@ -381,8 +411,13 @@ local function pickupMachine(source, params)
     end
     local itemInfo = {
         serial = machine.serial,
-        condition = 100,
+        condition = tonumber(machine.condition) or 100,
         machine_uuid = params.machineUuid,
+        upgrade_speed_level = tonumber(machine.upgrade_speed_level) or 0,
+        upgrade_capacity_level = tonumber(machine.upgrade_capacity_level) or 0,
+        upgrade_efficiency_level = tonumber(machine.upgrade_efficiency_level) or 0,
+        upgrade_durability_level = tonumber(machine.upgrade_durability_level) or 0,
+        upgrade_budget_used = tonumber(machine.upgrade_budget_used) or 0,
     }
     local addMutationId = opKey .. ':add'
     local addResult = CZCraft.QbInventoryAdapter.addMachineItem(source, addMutationId, itemName, itemInfo, 'czcraft pickup')
@@ -430,6 +465,31 @@ lib.callback.register('qb-czcraft:server:streamAll', function(source)
         return {}
     end
     return CZCraft.MachinesRepo.listInstalledProjection()
+end)
+
+-- House transfer hook: when a house is sold/transferred via qb-phone, the
+-- caller fires this event so czcraft reassigns all machines at the house to
+-- the new owner. Per decisions.md: "Imóvel transferido: Máquina, stock,
+-- bills e ciclo passam ao novo dono da casa." Active cycles continue under
+-- the new owner; condition-blocked machines stay blocked (new owner can
+-- maintain). Stock and bills are tied to machine_uuid, not owner.
+RegisterNetEvent('qb-czcraft:server:houseTransferred')
+AddEventHandler('qb-czcraft:server:houseTransferred', function(houseId, newOwnerCid)
+    if type(houseId) ~= 'string' or type(newOwnerCid) ~= 'string' then return end
+    if not CZCraft.Runtime or not CZCraft.Runtime.isReady then return end
+
+    local count = CZCraft.MachinesRepo.transferHouseMachines(houseId, newOwnerCid)
+    if count > 0 then
+        CZCraft.AuditRepo.append({
+            actor_type = 'SYSTEM', actor_id = 'house-transfer',
+            owner_type = 'PLAYER', owner_id = newOwnerCid,
+            machine_uuid = nil,
+            action = 'HOUSE_TRANSFER',
+            previous_state = { house_id = houseId },
+            next_state = { house_id = houseId, new_owner = newOwnerCid, machines_transferred = count },
+            reason = 'qb-phone house transfer',
+        })
+    end
 end)
 
 CZCraft.Api = Api

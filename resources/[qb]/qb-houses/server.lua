@@ -519,6 +519,9 @@ QBCore.Functions.CreateCallback('qb-phone:server:TransferCid', function(_, cb, N
             'UPDATE player_houses SET citizenid = ?, keyholders = ?, identifier = ? WHERE house = ?',
             { NewCid, json.encode(housekeyholders[HouseName]), result[1].license, HouseName })
         cb(true)
+        -- Notify qb-czcraft that the house has been transferred so it can
+        -- reassign any installed machines to the new owner.
+        TriggerEvent('qb-czcraft:server:houseTransferred', HouseName, NewCid)
     else
         cb(false)
     end

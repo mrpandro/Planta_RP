@@ -20,7 +20,9 @@ function CyclesRepo.loadActive(machineUuid)
         SELECT `cycle_id`, `cycle_sequence`, `machine_uuid`, `bill_id`,
                `recipe_id`, `recipe_hash`, `recipe_snapshot`, `started_at`,
                `due_at`, `duration_seconds`, `reserved_output_weight`,
-               `standard_cost`, `version`
+               `standard_cost`, `power_level_before`, `power_level_after`,
+               `power_to_consume`, `condition_before`, `condition_after`,
+               `wear_to_apply`, `version`
         FROM `czcraft_active_cycles`
         WHERE `machine_uuid` = ?
     ]], { machineUuid })
@@ -80,12 +82,16 @@ function CyclesRepo.start(params)
     end
 
     -- Insert the active cycle row with SHA2(canonical, 256).
+    -- Power/condition snapshot columns (v0.2) are nullable: NULL when the
+    -- feature is off or the machine row lacked the value (schema v1 / tests).
     local insertStatement = [[
         INSERT INTO `czcraft_active_cycles`
             (`cycle_id`, `cycle_sequence`, `machine_uuid`, `bill_id`, `recipe_id`,
              `recipe_hash`, `recipe_snapshot`, `started_at`, `due_at`,
-             `duration_seconds`, `reserved_output_weight`, `standard_cost`)
-        VALUES (?, ?, ?, ?, ?, SHA2(?, 256), ?, ?, ?, ?, ?, ?)
+             `duration_seconds`, `reserved_output_weight`, `standard_cost`,
+             `power_level_before`, `power_level_after`, `power_to_consume`,
+             `condition_before`, `condition_after`, `wear_to_apply`)
+        VALUES (?, ?, ?, ?, ?, SHA2(?, 256), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ]]
     local insertArgs = {
         params.cycle_id,
@@ -100,22 +106,81 @@ function CyclesRepo.start(params)
         params.duration_seconds,
         params.reserved_output_weight or 0,
         params.standard_cost or 0,
+        params.power_level_before,
+        params.power_level_after,
+        params.power_to_consume or 0,
+        params.condition_before,
+        params.condition_after,
+        params.wear_to_apply or 0,
     }
 
     -- Update the machine's active_cycle_id and operational_status.
-    local updateMachineStatement = [[
-        UPDATE `czcraft_machines`
-        SET `active_cycle_id` = ?,
-            `operational_status` = 'RUNNING',
-            `next_due_at` = ?,
-            `version` = `version` + 1
-        WHERE `machine_uuid` = ?
-    ]]
-    local updateMachineArgs = {
-        params.cycle_id,
-        dueAtIso,
-        params.machine_uuid,
-    }
+    -- When power/condition are consumed (v0.2), decrement them in the SAME
+    -- transaction as input consumption — the invariant is "input and energy
+    -- are consumed at cycle start" (overview.md line 80). The snapshot columns
+    -- on the active_cycles row record the result for audit; the machine row
+    -- is updated here, not on completion.
+    local hasPower = params.power_to_consume and params.power_to_consume > 0
+    local hasWear = params.wear_to_apply and params.wear_to_apply > 0
+    local updateMachineStatement
+    local updateMachineArgs
+    if hasPower and hasWear then
+        updateMachineStatement = [[
+            UPDATE `czcraft_machines`
+            SET `active_cycle_id` = ?,
+                `operational_status` = 'RUNNING',
+                `next_due_at` = ?,
+                `power_level` = GREATEST(0, CAST(`power_level` AS SIGNED) - ?),
+                `condition` = GREATEST(0, CAST(`condition` AS DECIMAL(5,2)) - ?),
+                `version` = `version` + 1
+            WHERE `machine_uuid` = ?
+        ]]
+        updateMachineArgs = {
+            params.cycle_id, dueAtIso,
+            params.power_to_consume, params.wear_to_apply,
+            params.machine_uuid,
+        }
+    elseif hasPower then
+        updateMachineStatement = [[
+            UPDATE `czcraft_machines`
+            SET `active_cycle_id` = ?,
+                `operational_status` = 'RUNNING',
+                `next_due_at` = ?,
+                `power_level` = GREATEST(0, CAST(`power_level` AS SIGNED) - ?),
+                `version` = `version` + 1
+            WHERE `machine_uuid` = ?
+        ]]
+        updateMachineArgs = {
+            params.cycle_id, dueAtIso,
+            params.power_to_consume, params.machine_uuid,
+        }
+    elseif hasWear then
+        updateMachineStatement = [[
+            UPDATE `czcraft_machines`
+            SET `active_cycle_id` = ?,
+                `operational_status` = 'RUNNING',
+                `next_due_at` = ?,
+                `condition` = GREATEST(0, CAST(`condition` AS DECIMAL(5,2)) - ?),
+                `version` = `version` + 1
+            WHERE `machine_uuid` = ?
+        ]]
+        updateMachineArgs = {
+            params.cycle_id, dueAtIso,
+            params.wear_to_apply, params.machine_uuid,
+        }
+    else
+        updateMachineStatement = [[
+            UPDATE `czcraft_machines`
+            SET `active_cycle_id` = ?,
+                `operational_status` = 'RUNNING',
+                `next_due_at` = ?,
+                `version` = `version` + 1
+            WHERE `machine_uuid` = ?
+        ]]
+        updateMachineArgs = {
+            params.cycle_id, dueAtIso, params.machine_uuid,
+        }
+    end
 
     -- Execute everything in a transaction.
     -- oxmysql 2.14.1 expects a table of { query, values } entries, not a
@@ -223,6 +288,8 @@ function CyclesRepo.complete(params)
     ]]
 
     -- Update the machine: clear active_cycle_id, set STOPPED.
+    -- Power was consumed at cycle START (in the start transaction), not here —
+    -- the invariant is "input and energy are consumed at cycle start."
     local updateMachineStatement = [[
         UPDATE `czcraft_machines`
         SET `active_cycle_id` = NULL,
@@ -230,6 +297,7 @@ function CyclesRepo.complete(params)
             `version` = `version` + 1
         WHERE `machine_uuid` = ?
     ]]
+    local updateMachineArgs = { params.machine_uuid }
 
     local replayed = false
 
@@ -384,16 +452,58 @@ function CyclesRepo.applyCatchUpChunk(params)
         startedAtIso, endedAtIso, params.idempotency_key,
     }
 
-    -- Advance the machine's next_due_at (the catch-up cursor).
-    local updateMachineStatement = [[
-        UPDATE `czcraft_machines`
-        SET `next_due_at` = ?,
-            `operational_status` = 'STOPPED',
-            `active_cycle_id` = NULL,
-            `version` = `version` + 1
-        WHERE `machine_uuid` = ?
-    ]]
-    local updateMachineArgs = { nextDueIso, params.machine_uuid }
+    -- Advance the machine's next_due_at (the catch-up cursor). When power
+    -- consumption and/or wear amounts are provided (v0.2), decrement them.
+    -- Guarded so neither goes below 0.
+    local hasPower = params.power_to_consume and params.power_to_consume > 0
+    local hasWear = params.wear_to_apply and params.wear_to_apply > 0
+    local updateMachineStatement
+    local updateMachineArgs
+    if hasPower and hasWear then
+        updateMachineStatement = [[
+            UPDATE `czcraft_machines`
+            SET `next_due_at` = ?,
+                `operational_status` = 'STOPPED',
+                `active_cycle_id` = NULL,
+                `power_level` = GREATEST(0, CAST(`power_level` AS SIGNED) - ?),
+                `condition` = GREATEST(0, CAST(`condition` AS DECIMAL(5,2)) - ?),
+                `version` = `version` + 1
+            WHERE `machine_uuid` = ?
+        ]]
+        updateMachineArgs = { nextDueIso, params.power_to_consume, params.wear_to_apply, params.machine_uuid }
+    elseif hasPower then
+        updateMachineStatement = [[
+            UPDATE `czcraft_machines`
+            SET `next_due_at` = ?,
+                `operational_status` = 'STOPPED',
+                `active_cycle_id` = NULL,
+                `power_level` = GREATEST(0, CAST(`power_level` AS SIGNED) - ?),
+                `version` = `version` + 1
+            WHERE `machine_uuid` = ?
+        ]]
+        updateMachineArgs = { nextDueIso, params.power_to_consume, params.machine_uuid }
+    elseif hasWear then
+        updateMachineStatement = [[
+            UPDATE `czcraft_machines`
+            SET `next_due_at` = ?,
+                `operational_status` = 'STOPPED',
+                `active_cycle_id` = NULL,
+                `condition` = GREATEST(0, CAST(`condition` AS DECIMAL(5,2)) - ?),
+                `version` = `version` + 1
+            WHERE `machine_uuid` = ?
+        ]]
+        updateMachineArgs = { nextDueIso, params.wear_to_apply, params.machine_uuid }
+    else
+        updateMachineStatement = [[
+            UPDATE `czcraft_machines`
+            SET `next_due_at` = ?,
+                `operational_status` = 'STOPPED',
+                `active_cycle_id` = NULL,
+                `version` = `version` + 1
+            WHERE `machine_uuid` = ?
+        ]]
+        updateMachineArgs = { nextDueIso, params.machine_uuid }
+    end
 
     local replayed = false
 

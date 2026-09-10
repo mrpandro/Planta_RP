@@ -160,6 +160,41 @@ RegisterNUICallback('removeBill', function(data, cb)
     cb(result or { success = false, reason = 'no response' })
 end)
 
+RegisterNUICallback('performMaintenance', function(data, cb)
+    if not data or not data.machineUuid then
+        cb({ success = false, reason = 'machineUuid required' })
+        return
+    end
+    local result = lib.callback.await('qb-czcraft:server:nui:performMaintenance', false, {
+        machineUuid = data.machineUuid,
+    })
+    cb(result or { success = false, reason = 'no response' })
+end)
+
+RegisterNUICallback('purchaseUpgrade', function(data, cb)
+    if not data or not data.machineUuid then
+        cb({ success = false, reason = 'machineUuid required' })
+        return
+    end
+    local result = lib.callback.await('qb-czcraft:server:nui:purchaseUpgrade', false, {
+        machineUuid = data.machineUuid,
+        track = data.track,
+    })
+    cb(result or { success = false, reason = 'no response' })
+end)
+
+RegisterNUICallback('downgradeUpgrade', function(data, cb)
+    if not data or not data.machineUuid then
+        cb({ success = false, reason = 'machineUuid required' })
+        return
+    end
+    local result = lib.callback.await('qb-czcraft:server:nui:downgradeUpgrade', false, {
+        machineUuid = data.machineUuid,
+        track = data.track,
+    })
+    cb(result or { success = false, reason = 'no response' })
+end)
+
 -- Close NUI on ESC.
 CreateThread(function()
     while true do

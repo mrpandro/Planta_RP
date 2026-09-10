@@ -17,6 +17,7 @@ CZCraft = CZCraft or {}
 local BillMode = {
     PRODUCE_X = 'PRODUCE_X',
     MAINTAIN_X = 'MAINTAIN_X',
+    UNTIL_X = 'UNTIL_X',
 }
 
 local BillStatus = {
@@ -27,13 +28,37 @@ local BillStatus = {
     REMOVED = 'REMOVED',
 }
 
+-- v0.2 bill priorities. Lower sortValue = higher priority. The sort values
+-- match config/balance.lua; a built-in default keeps the domain correct even
+-- when no injected sort map is supplied (e.g. pure unit tests).
 local BillPriority = {
+    HIGH = 'HIGH',
     NORMAL = 'NORMAL',
+    LOW = 'LOW',
 }
+
+local DEFAULT_PRIORITY_SORT = {
+    HIGH = 1,
+    NORMAL = 2,
+    LOW = 3,
+}
+
+-- Resolves a priority name to a numeric sort value. Unknown priorities sort
+-- last (999) so a misconfigured bill cannot preempt valid ones.
+-- @param priority string
+-- @param sortValues table|nil injected { [priority] = number } (from config)
+-- @return number
+local function prioritySortValue(priority, sortValues)
+    if sortValues and sortValues[priority] then
+        return sortValues[priority]
+    end
+    return DEFAULT_PRIORITY_SORT[priority] or 999
+end
 
 -- Validates a bill creation request.
 -- @param params table {
 --   mode, recipeId, primaryOutput, targetQuantity, batchOutputAmount,
+--   priority? = 'HIGH'|'NORMAL'|'LOW', untilThreshold? (required for UNTIL_X),
 --   createdBy = { type, id },
 -- }
 -- @return boolean ok
@@ -42,8 +67,10 @@ local function validateBillCreation(params)
     if type(params) ~= 'table' then
         return false, 'params must be a table'
     end
-    if params.mode ~= BillMode.PRODUCE_X and params.mode ~= BillMode.MAINTAIN_X then
-        return false, 'mode must be PRODUCE_X or MAINTAIN_X'
+    if params.mode ~= BillMode.PRODUCE_X
+       and params.mode ~= BillMode.MAINTAIN_X
+       and params.mode ~= BillMode.UNTIL_X then
+        return false, 'mode must be PRODUCE_X, MAINTAIN_X, or UNTIL_X'
     end
     if type(params.recipeId) ~= 'string' or params.recipeId == '' then
         return false, 'recipeId must be a nonempty string'
@@ -61,6 +88,15 @@ local function validateBillCreation(params)
         or params.batchOutputAmount <= 0 then
         return false, 'batchOutputAmount must be a positive integer'
     end
+
+    -- Priority (defaults to NORMAL when omitted).
+    local priority = params.priority or BillPriority.NORMAL
+    if priority ~= BillPriority.HIGH
+       and priority ~= BillPriority.NORMAL
+       and priority ~= BillPriority.LOW then
+        return false, 'priority must be HIGH, NORMAL, or LOW'
+    end
+
     -- PRODUCE_X: target must be a multiple of the batch output amount.
     if params.mode == BillMode.PRODUCE_X then
         if params.targetQuantity % params.batchOutputAmount ~= 0 then
@@ -68,6 +104,30 @@ local function validateBillCreation(params)
                 params.targetQuantity, params.batchOutputAmount)
         end
     end
+
+    -- UNTIL_X: until_threshold is the stock target. It must be a positive
+    -- integer, a multiple of the batch output (validated against batch size at
+    -- creation time so production lands exactly on the threshold without
+    -- overshoot), and at least the configured minimum. target_quantity is
+    -- required > 0 by the schema for all modes; for UNTIL_X the caller sets it
+    -- equal to until_threshold (the domain reads until_threshold).
+    if params.mode == BillMode.UNTIL_X then
+        local untilThreshold = params.untilThreshold
+        if type(untilThreshold) ~= 'number'
+           or untilThreshold ~= math.floor(untilThreshold)
+           or untilThreshold <= 0 then
+            return false, 'UNTIL_X untilThreshold must be a positive integer'
+        end
+        if untilThreshold % params.batchOutputAmount ~= 0 then
+            return false, ('UNTIL_X untilThreshold (%d) must be a multiple of batch output (%d)'):format(
+                untilThreshold, params.batchOutputAmount)
+        end
+    else
+        if params.untilThreshold ~= nil then
+            return false, 'untilThreshold must only be set for UNTIL_X mode'
+        end
+    end
+
     return true
 end
 
@@ -94,11 +154,29 @@ local function isMaintainXSatisfied(bill, stockPlusReserved, batchOutputAmount)
     return available >= target
 end
 
+-- Checks whether a UNTIL_X bill is satisfied.
+-- UNTIL_X is satisfied when stock + reserved >= until_threshold. Unlike
+-- MAINTAIN_X, UNTIL_X never overshoots: the threshold is a multiple of the
+-- batch size (validated at creation), so production lands exactly on it.
+-- @param bill table { until_threshold }
+-- @param stockPlusReserved number
+-- @return boolean satisfied
+local function isUntilXSatisfied(bill, stockPlusReserved)
+    local threshold = bill.until_threshold
+    if not threshold then return true end
+    return (stockPlusReserved or 0) >= threshold
+end
+
 -- Determines whether a new cycle should start for a bill.
 -- PRODUCE_X: start if not complete (produced < target).
 -- MAINTAIN_X: start if stock + reserved < target (may overshoot by one batch).
+-- UNTIL_X: start only if a full batch fits without exceeding the threshold
+--   (stock + reserved + batch <= until_threshold). This guarantees no
+--   overshoot; a misaligned stock level (e.g. from a player deposit that is not
+--   a multiple of the batch) leaves the machine idle just below the threshold
+--   rather than overshooting — the player can withdraw to re-align.
 -- @param bill table
--- @param stockPlusReserved number (for MAINTAIN_X)
+-- @param stockPlusReserved number (for MAINTAIN_X / UNTIL_X)
 -- @param batchOutputAmount number
 -- @return boolean shouldStart
 local function shouldStartCycle(bill, stockPlusReserved, batchOutputAmount)
@@ -113,6 +191,16 @@ local function shouldStartCycle(bill, stockPlusReserved, batchOutputAmount)
     end
     if bill.mode == BillMode.MAINTAIN_X then
         return not isMaintainXSatisfied(bill, stockPlusReserved, batchOutputAmount)
+    end
+    if bill.mode == BillMode.UNTIL_X then
+        local threshold = bill.until_threshold
+        if not threshold then return false end
+        local available = stockPlusReserved or 0
+        if available >= threshold then
+            return false
+        end
+        -- Only start when a full batch fits without exceeding the threshold.
+        return (available + batchOutputAmount) <= threshold
     end
     return false
 end
@@ -210,6 +298,25 @@ local function computeCyclesForChunk(params)
             if billBoundedCycles < cycles then
                 cycles = billBoundedCycles
             end
+        elseif bill.mode == BillMode.UNTIL_X then
+            -- UNTIL_X: never overshoot the threshold. Use floor so production
+            -- stays at or below until_threshold. The threshold is a multiple
+            -- of the batch size (validated at creation), so starting from an
+            -- aligned stock level lands exactly on the threshold.
+            local threshold = bill.until_threshold
+            if not threshold then
+                return 0, 'until_x threshold missing'
+            end
+            local stockPlusReserved = params.stockPlusReserved or 0
+            local batchOutput = params.batchOutputAmount or 1
+            local remainingToThreshold = threshold - stockPlusReserved
+            if remainingToThreshold <= 0 then
+                return 0, 'until_x threshold already met'
+            end
+            local billBoundedCycles = math.floor(remainingToThreshold / batchOutput)
+            if billBoundedCycles < cycles then
+                cycles = billBoundedCycles
+            end
         end
     end
 
@@ -221,13 +328,16 @@ local function computeCyclesForChunk(params)
 end
 
 -- Selects the next bill to run for a machine from a list of candidate bills.
--- Stable order: enabled first, then by priority (NORMAL only at v0.1), then
--- by created_sequence (ascending).
+-- Stable order: enabled first, then by priority (lower sortValue = higher
+-- priority), then by created_sequence (ascending). The prioritySortValues
+-- map is injected from config/balance.lua; a built-in default keeps the order
+-- correct when none is supplied.
 -- @param bills table list of bill rows
--- @param stockPlusReservedByItem table { [primary_output] = number } (for MAINTAIN_X)
+-- @param stockPlusReservedByItem table { [primary_output] = number } (for MAINTAIN_X / UNTIL_X)
 -- @param batchOutputByBill table { [bill_id] = number }
+-- @param prioritySortValues table|nil { [priority_name] = number }
 -- @return table|nil selectedBill
-local function selectNextBill(bills, stockPlusReservedByItem, batchOutputByBill)
+local function selectNextBill(bills, stockPlusReservedByItem, batchOutputByBill, prioritySortValues)
     if type(bills) ~= 'table' then return nil end
 
     local candidates = {}
@@ -245,11 +355,12 @@ local function selectNextBill(bills, stockPlusReservedByItem, batchOutputByBill)
         return nil
     end
 
-    -- Sort by priority (NORMAL only at v0.1, so this is stable), then by
-    -- created_sequence ascending.
+    -- Sort by priority sort value (ascending), then created_sequence ascending.
     table.sort(candidates, function(a, b)
-        if a.priority ~= b.priority then
-            return a.priority < b.priority
+        local sa = prioritySortValue(a.priority, prioritySortValues)
+        local sb = prioritySortValue(b.priority, prioritySortValues)
+        if sa ~= sb then
+            return sa < sb
         end
         return (a.created_sequence or 0) < (b.created_sequence or 0)
     end)
@@ -272,6 +383,7 @@ CZCraft.Bills = {
     validateBillCreation = validateBillCreation,
     isProduceXComplete = isProduceXComplete,
     isMaintainXSatisfied = isMaintainXSatisfied,
+    isUntilXSatisfied = isUntilXSatisfied,
     shouldStartCycle = shouldStartCycle,
     computeCyclesForChunk = computeCyclesForChunk,
     selectNextBill = selectNextBill,

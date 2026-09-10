@@ -78,6 +78,7 @@ resources\[meus-scripts]\qb-czcraft\client\placement.lua
 resources\[meus-scripts]\qb-czcraft\client\repairkit.lua
 resources\[meus-scripts]\qb-czcraft\client\streaming.lua
 resources\[meus-scripts]\qb-czcraft\config\access.lua
+resources\[meus-scripts]\qb-czcraft\config\balance.lua
 resources\[meus-scripts]\qb-czcraft\config\general.lua
 resources\[meus-scripts]\qb-czcraft\config\machines.lua
 resources\[meus-scripts]\qb-czcraft\config\plots.lua
@@ -85,6 +86,7 @@ resources\[meus-scripts]\qb-czcraft\config\recipes.lua
 resources\[meus-scripts]\qb-czcraft\fxmanifest.lua
 resources\[meus-scripts]\qb-czcraft\locales\en.lua
 resources\[meus-scripts]\qb-czcraft\locales\pt.lua
+resources\[meus-scripts]\qb-czcraft\server\adapters\finance.lua
 resources\[meus-scripts]\qb-czcraft\server\adapters\qb_core.lua
 resources\[meus-scripts]\qb-czcraft\server\adapters\qb_houses.lua
 resources\[meus-scripts]\qb-czcraft\server\adapters\qb_inventory.lua
@@ -93,12 +95,15 @@ resources\[meus-scripts]\qb-czcraft\server\bootstrap.lua
 resources\[meus-scripts]\qb-czcraft\server\cycle_engine.lua
 resources\[meus-scripts]\qb-czcraft\server\domain\bills.lua
 resources\[meus-scripts]\qb-czcraft\server\domain\catchup.lua
+resources\[meus-scripts]\qb-czcraft\server\domain\condition.lua
 resources\[meus-scripts]\qb-czcraft\server\domain\machines.lua
 resources\[meus-scripts]\qb-czcraft\server\domain\owners.lua
 resources\[meus-scripts]\qb-czcraft\server\domain\permissions.lua
+resources\[meus-scripts]\qb-czcraft\server\domain\power.lua
 resources\[meus-scripts]\qb-czcraft\server\domain\production.lua
 resources\[meus-scripts]\qb-czcraft\server\domain\scheduler.lua
 resources\[meus-scripts]\qb-czcraft\server\domain\storage.lua
+resources\[meus-scripts]\qb-czcraft\server\domain\upgrades.lua
 resources\[meus-scripts]\qb-czcraft\server\e2e_run.lua
 resources\[meus-scripts]\qb-czcraft\server\event_bus.lua
 resources\[meus-scripts]\qb-czcraft\server\nui_api.lua
@@ -106,11 +111,15 @@ resources\[meus-scripts]\qb-czcraft\server\repairkit.lua
 resources\[meus-scripts]\qb-czcraft\server\repositories\audit.lua
 resources\[meus-scripts]\qb-czcraft\server\repositories\bills.lua
 resources\[meus-scripts]\qb-czcraft\server\repositories\cycles.lua
+resources\[meus-scripts]\qb-czcraft\server\repositories\finance.lua
 resources\[meus-scripts]\qb-czcraft\server\repositories\machines.lua
 resources\[meus-scripts]\qb-czcraft\server\repositories\operations.lua
 resources\[meus-scripts]\qb-czcraft\server\repositories\stock.lua
 resources\[meus-scripts]\qb-czcraft\server\scheduler_tick.lua
 resources\[meus-scripts]\qb-czcraft\server\schema_gate.lua
+resources\[meus-scripts]\qb-czcraft\server\services\maintenance.lua
+resources\[meus-scripts]\qb-czcraft\server\services\upgrades.lua
+resources\[meus-scripts]\qb-czcraft\server\usable_items.lua
 resources\[meus-scripts]\qb-czcraft\shared\constants.lua
 resources\[meus-scripts]\qb-czcraft\shared\recipe_catalog.lua
 resources\[meus-scripts]\qb-czcraft\shared\recipe_snapshot.lua

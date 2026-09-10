@@ -82,7 +82,7 @@ return {
                 batchOutputAmount = 2,
             })
             assertFalse(ok, "should fail")
-            assertContains(reason, "PRODUCE_X or MAINTAIN_X", "reason mentions valid modes")
+            assertContains(reason, "UNTIL_X", "reason mentions valid modes including UNTIL_X")
         end,
     },
     {
@@ -393,6 +393,317 @@ return {
             })
             assertEqual(cycles, 0, "no cycles when target met")
             assertContains(reason, "maintain target", "reason mentions maintain target")
+        end,
+    },
+    -- =========================================================================
+    -- v0.2: priority ordering (HIGH/NORMAL/LOW)
+    -- =========================================================================
+    {
+        name = "BillPriority exposes HIGH, NORMAL, and LOW",
+        test = function()
+            assertEqual(Bills.Priority.HIGH, 'HIGH', "HIGH")
+            assertEqual(Bills.Priority.NORMAL, 'NORMAL', "NORMAL")
+            assertEqual(Bills.Priority.LOW, 'LOW', "LOW")
+        end,
+    },
+    {
+        name = "validateBillCreation accepts HIGH priority",
+        test = function()
+            local ok, reason = Bills.validateBillCreation({
+                mode = Bills.Mode.PRODUCE_X,
+                recipeId = 'smelt_steel',
+                primaryOutput = 'steel',
+                targetQuantity = 100,
+                batchOutputAmount = 2,
+                priority = 'HIGH',
+            })
+            assertTrue(ok, "HIGH priority should pass")
+            assertEqual(reason, nil, "no reason")
+        end,
+    },
+    {
+        name = "validateBillCreation rejects unknown priority",
+        test = function()
+            local ok, reason = Bills.validateBillCreation({
+                mode = Bills.Mode.PRODUCE_X,
+                recipeId = 'smelt_steel',
+                primaryOutput = 'steel',
+                targetQuantity = 100,
+                batchOutputAmount = 2,
+                priority = 'URGENT',
+            })
+            assertFalse(ok, "unknown priority should fail")
+            assertContains(reason, "priority", "reason mentions priority")
+        end,
+    },
+    {
+        name = "validateBillCreation defaults priority to NORMAL when omitted",
+        test = function()
+            local ok = Bills.validateBillCreation({
+                mode = Bills.Mode.PRODUCE_X,
+                recipeId = 'smelt_steel',
+                primaryOutput = 'steel',
+                targetQuantity = 100,
+                batchOutputAmount = 2,
+            })
+            assertTrue(ok, "omitted priority defaults to NORMAL and passes")
+        end,
+    },
+    {
+        name = "selectNextBill: HIGH priority preempts NORMAL (default sort map)",
+        test = function()
+            local bills = {
+                { bill_id = 'b1', enabled = true, status = 'ACTIVE', mode = 'PRODUCE_X', priority = 'NORMAL', created_sequence = 10, target_quantity = 100, produced_quantity = 0, primary_output = 'steel' },
+                { bill_id = 'b2', enabled = true, status = 'ACTIVE', mode = 'PRODUCE_X', priority = 'HIGH', created_sequence = 20, target_quantity = 100, produced_quantity = 0, primary_output = 'steel' },
+            }
+            local selected = Bills.selectNextBill(bills, {}, { b1 = 2, b2 = 2 })
+            assertEqual(selected.bill_id, 'b2', "HIGH preempts NORMAL even though b1 was created first")
+        end,
+    },
+    {
+        name = "selectNextBill: NORMAL preempts LOW (default sort map)",
+        test = function()
+            local bills = {
+                { bill_id = 'b1', enabled = true, status = 'ACTIVE', mode = 'PRODUCE_X', priority = 'LOW', created_sequence = 10, target_quantity = 100, produced_quantity = 0, primary_output = 'steel' },
+                { bill_id = 'b2', enabled = true, status = 'ACTIVE', mode = 'PRODUCE_X', priority = 'NORMAL', created_sequence = 20, target_quantity = 100, produced_quantity = 0, primary_output = 'steel' },
+            }
+            local selected = Bills.selectNextBill(bills, {}, { b1 = 2, b2 = 2 })
+            assertEqual(selected.bill_id, 'b2', "NORMAL preempts LOW")
+        end,
+    },
+    {
+        name = "selectNextBill: equal priority falls back to created_sequence",
+        test = function()
+            local bills = {
+                { bill_id = 'b2', enabled = true, status = 'ACTIVE', mode = 'PRODUCE_X', priority = 'HIGH', created_sequence = 20, target_quantity = 100, produced_quantity = 0, primary_output = 'steel' },
+                { bill_id = 'b1', enabled = true, status = 'ACTIVE', mode = 'PRODUCE_X', priority = 'HIGH', created_sequence = 10, target_quantity = 100, produced_quantity = 0, primary_output = 'steel' },
+            }
+            local selected = Bills.selectNextBill(bills, {}, { b1 = 2, b2 = 2 })
+            assertEqual(selected.bill_id, 'b1', "equal priority -> earliest created_sequence")
+        end,
+    },
+    {
+        name = "selectNextBill: injected sort map overrides default order",
+        test = function()
+            -- Inverted sort map: LOW is highest priority.
+            local sortMap = { LOW = 1, NORMAL = 2, HIGH = 3 }
+            local bills = {
+                { bill_id = 'b1', enabled = true, status = 'ACTIVE', mode = 'PRODUCE_X', priority = 'HIGH', created_sequence = 10, target_quantity = 100, produced_quantity = 0, primary_output = 'steel' },
+                { bill_id = 'b2', enabled = true, status = 'ACTIVE', mode = 'PRODUCE_X', priority = 'LOW', created_sequence = 20, target_quantity = 100, produced_quantity = 0, primary_output = 'steel' },
+            }
+            local selected = Bills.selectNextBill(bills, {}, { b1 = 2, b2 = 2 }, sortMap)
+            assertEqual(selected.bill_id, 'b2', "injected sort map makes LOW highest")
+        end,
+    },
+    {
+        name = "selectNextBill: unknown priority sorts last",
+        test = function()
+            local bills = {
+                { bill_id = 'b1', enabled = true, status = 'ACTIVE', mode = 'PRODUCE_X', priority = 'WEIRD', created_sequence = 10, target_quantity = 100, produced_quantity = 0, primary_output = 'steel' },
+                { bill_id = 'b2', enabled = true, status = 'ACTIVE', mode = 'PRODUCE_X', priority = 'LOW', created_sequence = 20, target_quantity = 100, produced_quantity = 0, primary_output = 'steel' },
+            }
+            local selected = Bills.selectNextBill(bills, {}, { b1 = 2, b2 = 2 })
+            assertEqual(selected.bill_id, 'b2', "unknown priority sorts after LOW")
+        end,
+    },
+    -- =========================================================================
+    -- v0.2: UNTIL_X bill mode
+    -- =========================================================================
+    {
+        name = "BillMode exposes UNTIL_X",
+        test = function()
+            assertEqual(Bills.Mode.UNTIL_X, 'UNTIL_X', "UNTIL_X mode")
+        end,
+    },
+    {
+        name = "UNTIL_X bill creation passes when threshold is a multiple of batch",
+        test = function()
+            local ok, reason = Bills.validateBillCreation({
+                mode = Bills.Mode.UNTIL_X,
+                recipeId = 'smelt_steel',
+                primaryOutput = 'steel',
+                targetQuantity = 20,
+                batchOutputAmount = 5,
+                untilThreshold = 20,
+            })
+            assertTrue(ok, "should pass")
+            assertEqual(reason, nil, "no reason")
+        end,
+    },
+    {
+        name = "UNTIL_X bill creation fails when threshold is not a multiple of batch",
+        test = function()
+            local ok, reason = Bills.validateBillCreation({
+                mode = Bills.Mode.UNTIL_X,
+                recipeId = 'smelt_steel',
+                primaryOutput = 'steel',
+                targetQuantity = 21,
+                batchOutputAmount = 5,
+                untilThreshold = 21,
+            })
+            assertFalse(ok, "non-multiple threshold should fail")
+            assertContains(reason, "multiple of batch", "reason mentions batch multiple")
+        end,
+    },
+    {
+        name = "UNTIL_X bill creation fails when untilThreshold is missing",
+        test = function()
+            local ok, reason = Bills.validateBillCreation({
+                mode = Bills.Mode.UNTIL_X,
+                recipeId = 'smelt_steel',
+                primaryOutput = 'steel',
+                targetQuantity = 20,
+                batchOutputAmount = 5,
+            })
+            assertFalse(ok, "missing untilThreshold should fail")
+            assertContains(reason, "untilThreshold", "reason mentions untilThreshold")
+        end,
+    },
+    {
+        name = "UNTIL_X bill creation fails when untilThreshold is non-positive",
+        test = function()
+            local ok = Bills.validateBillCreation({
+                mode = Bills.Mode.UNTIL_X,
+                recipeId = 'smelt_steel',
+                primaryOutput = 'steel',
+                targetQuantity = 20,
+                batchOutputAmount = 5,
+                untilThreshold = 0,
+            })
+            assertFalse(ok, "zero untilThreshold should fail")
+        end,
+    },
+    {
+        name = "non-UNTIL_X bill creation fails when untilThreshold is set",
+        test = function()
+            local ok, reason = Bills.validateBillCreation({
+                mode = Bills.Mode.PRODUCE_X,
+                recipeId = 'smelt_steel',
+                primaryOutput = 'steel',
+                targetQuantity = 20,
+                batchOutputAmount = 5,
+                untilThreshold = 20,
+            })
+            assertFalse(ok, "untilThreshold on PRODUCE_X should fail")
+            assertContains(reason, "UNTIL_X", "reason mentions UNTIL_X")
+        end,
+    },
+    {
+        name = "isUntilXSatisfied: true when stock+reserved >= threshold",
+        test = function()
+            local bill = { until_threshold = 20 }
+            assertTrue(Bills.isUntilXSatisfied(bill, 20), "at threshold")
+            assertTrue(Bills.isUntilXSatisfied(bill, 25), "above threshold")
+        end,
+    },
+    {
+        name = "isUntilXSatisfied: false when stock+reserved < threshold",
+        test = function()
+            local bill = { until_threshold = 20 }
+            assertFalse(Bills.isUntilXSatisfied(bill, 19), "below threshold")
+        end,
+    },
+    {
+        name = "shouldStartCycle: UNTIL_X starts when a full batch fits without overshoot",
+        test = function()
+            local bill = { mode = Bills.Mode.UNTIL_X, enabled = true, status = 'ACTIVE', until_threshold = 20 }
+            -- stock=15, batch=5: 15+5=20 <= 20 -> start (lands exactly on threshold)
+            assertTrue(Bills.shouldStartCycle(bill, 15, 5), "should start when batch fits exactly")
+            -- stock=10, batch=5: 10+5=15 <= 20 -> start
+            assertTrue(Bills.shouldStartCycle(bill, 10, 5), "should start with room to spare")
+        end,
+    },
+    {
+        name = "shouldStartCycle: UNTIL_X does not start when batch would overshoot",
+        test = function()
+            local bill = { mode = Bills.Mode.UNTIL_X, enabled = true, status = 'ACTIVE', until_threshold = 20 }
+            -- stock=17, batch=5: 17+5=22 > 20 -> no start (no overshoot; misaligned)
+            assertFalse(Bills.shouldStartCycle(bill, 17, 5), "should not start when batch would overshoot")
+        end,
+    },
+    {
+        name = "shouldStartCycle: UNTIL_X does not start when threshold already met",
+        test = function()
+            local bill = { mode = Bills.Mode.UNTIL_X, enabled = true, status = 'ACTIVE', until_threshold = 20 }
+            assertFalse(Bills.shouldStartCycle(bill, 20, 5), "should not start at threshold")
+            assertFalse(Bills.shouldStartCycle(bill, 25, 5), "should not start above threshold")
+        end,
+    },
+    {
+        name = "computeCyclesForChunk: UNTIL_X bounds to threshold without overshoot (floor)",
+        test = function()
+            -- threshold=20, batch=5, stock=0 -> floor(20/5)=4 cycles -> exactly 20
+            local cycles = Bills.computeCyclesForChunk({
+                recipeDurationSeconds = 60,
+                elapsedSeconds = 600,
+                maxCyclesPerChunk = 100,
+                inputAvailability = { iron = 1000 },
+                recipeInputs = { { item = 'iron', amount = 5 } },
+                outputCapacityRemaining = 100000,
+                outputWeightPerCycle = 200,
+                bill = { mode = 'UNTIL_X', until_threshold = 20 },
+                batchOutputAmount = 5,
+                stockPlusReserved = 0,
+            })
+            assertEqual(cycles, 4, "4 cycles to reach exactly 20 (no overshoot)")
+        end,
+    },
+    {
+        name = "computeCyclesForChunk: UNTIL_X partial progress does not overshoot",
+        test = function()
+            -- threshold=20, batch=5, stock=12 -> floor((20-12)/5)=floor(1.6)=1 cycle -> 17 (no overshoot)
+            local cycles = Bills.computeCyclesForChunk({
+                recipeDurationSeconds = 60,
+                elapsedSeconds = 600,
+                maxCyclesPerChunk = 100,
+                inputAvailability = { iron = 1000 },
+                recipeInputs = { { item = 'iron', amount = 5 } },
+                outputCapacityRemaining = 100000,
+                outputWeightPerCycle = 200,
+                bill = { mode = 'UNTIL_X', until_threshold = 20 },
+                batchOutputAmount = 5,
+                stockPlusReserved = 12,
+            })
+            assertEqual(cycles, 1, "1 cycle (floor, no overshoot to 17)")
+        end,
+    },
+    {
+        name = "computeCyclesForChunk: UNTIL_X at threshold returns 0",
+        test = function()
+            local cycles, reason = Bills.computeCyclesForChunk({
+                recipeDurationSeconds = 60,
+                elapsedSeconds = 600,
+                maxCyclesPerChunk = 100,
+                inputAvailability = { iron = 1000 },
+                recipeInputs = { { item = 'iron', amount = 5 } },
+                outputCapacityRemaining = 100000,
+                outputWeightPerCycle = 200,
+                bill = { mode = 'UNTIL_X', until_threshold = 20 },
+                batchOutputAmount = 5,
+                stockPlusReserved = 20,
+            })
+            assertEqual(cycles, 0, "no cycles when threshold met")
+            assertContains(reason, "until_x", "reason mentions until_x")
+        end,
+    },
+    {
+        name = "computeCyclesForChunk: UNTIL_X never overshoots even with huge elapsed",
+        test = function()
+            -- threshold=20, batch=5, stock=0, but elapsed allows 100 cycles.
+            -- floor(20/5)=4 -> capped at 4 (never overshoots to 25).
+            local cycles = Bills.computeCyclesForChunk({
+                recipeDurationSeconds = 60,
+                elapsedSeconds = 6000,
+                maxCyclesPerChunk = 100,
+                inputAvailability = { iron = 10000 },
+                recipeInputs = { { item = 'iron', amount = 5 } },
+                outputCapacityRemaining = 100000,
+                outputWeightPerCycle = 200,
+                bill = { mode = 'UNTIL_X', until_threshold = 20 },
+                batchOutputAmount = 5,
+                stockPlusReserved = 0,
+            })
+            assertEqual(cycles, 4, "capped at 4 even with huge elapsed (no overshoot)")
         end,
     },
 }

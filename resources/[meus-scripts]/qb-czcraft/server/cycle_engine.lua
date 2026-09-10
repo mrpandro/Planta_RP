@@ -65,6 +65,40 @@ local function findMachineConfig(machineType)
     return nil
 end
 
+-- Reads upgrade levels from a machine row and returns the effective values
+-- after applying upgrade bonuses. Returns nil for each effect when the
+-- upgrades feature is off or the machine row lacks upgrade columns.
+-- @param machine table machine row (may have upgrade_*_level columns)
+-- @param baseCapacity number (from machine config)
+-- @param baseDuration number (from recipe)
+-- @param basePowerPerCycle number (from config)
+-- @param baseWearPerCycle number (from config)
+-- @return table { capacity, duration, powerPerCycle, wearPerCycle }
+local function applyUpgradeEffects(machine, baseCapacity, baseDuration, basePowerPerCycle, baseWearPerCycle)
+    local upgradesEnabled = CZCraft.Config and CZCraft.Config.General
+        and CZCraft.Config.General.features and CZCraft.Config.General.features.upgrades
+    if not upgradesEnabled or not machine then
+        return {
+            capacity = baseCapacity,
+            duration = baseDuration,
+            powerPerCycle = basePowerPerCycle,
+            wearPerCycle = baseWearPerCycle,
+        }
+    end
+
+    local speedLevel = tonumber(machine.upgrade_speed_level) or 0
+    local capacityLevel = tonumber(machine.upgrade_capacity_level) or 0
+    local efficiencyLevel = tonumber(machine.upgrade_efficiency_level) or 0
+    local durabilityLevel = tonumber(machine.upgrade_durability_level) or 0
+
+    return {
+        capacity = CZCraft.Upgrades.effectiveCapacity(baseCapacity, capacityLevel),
+        duration = CZCraft.Upgrades.effectiveDuration(baseDuration, speedLevel),
+        powerPerCycle = CZCraft.Upgrades.effectivePowerConsumption(basePowerPerCycle, efficiencyLevel),
+        wearPerCycle = CZCraft.Upgrades.effectiveWear(baseWearPerCycle, durabilityLevel),
+    }
+end
+
 -- Builds an item-weight map { [item_name] = weight_in_grams } for the items
 -- referenced by a recipe, from the QBCore shared item registry.
 -- @param recipe table
@@ -147,6 +181,24 @@ local function stockPlusReservedForItem(stockRows, itemName)
     return total
 end
 
+-- Builds the priority sort-value map from config/balance.lua for bill
+-- selection. Returns { [priority_name] = sortValue }. Cached after first call.
+-- @return table
+local prioritySortValuesCache
+local function buildPrioritySortValues()
+    if prioritySortValuesCache then return prioritySortValuesCache end
+    prioritySortValuesCache = {}
+    local cfg = CZCraft.Config and CZCraft.Config.Balance and CZCraft.Config.Balance.priority
+    if type(cfg) == 'table' then
+        for name, entry in pairs(cfg) do
+            if type(entry) == 'table' and type(entry.sortValue) == 'number' then
+                prioritySortValuesCache[name] = entry.sortValue
+            end
+        end
+    end
+    return prioritySortValuesCache
+end
+
 -- ===========================================================================
 -- Start next real-time cycle (shared by both modes)
 -- ===========================================================================
@@ -157,13 +209,54 @@ end
 -- @param machineVersion number
 -- @param machineType string
 -- @param now number unix seconds
+-- @param machine table|nil loaded machine row (for power_level/condition; nil skips gates)
 -- @return string outcome ('started'|'idle'|'blocked')
 -- @return string|nil reason
-local function startNextCycle(machineUuid, machineVersion, machineType, now)
+local function startNextCycle(machineUuid, machineVersion, machineType, now, machine)
     local bills = CZCraft.BillsRepo.listActiveForMachine(machineUuid)
     local stockRows = CZCraft.StockRepo.loadAll(machineUuid)
     local machineConfig = findMachineConfig(machineType)
-    local capacity = machineConfig and machineConfig.stockCapacity or 0
+    local baseCapacity = machineConfig and machineConfig.stockCapacity or 0
+
+    -- Compute upgrade-adjusted base values. When upgrades are off or the
+    -- machine row lacks upgrade columns, these fall back to the base values.
+    local basePowerPerCycle = CZCraft.Power.computePowerConsumption()
+    local baseWearPerCycle = CZCraft.Condition.computeWear()
+    local upgradeEffects = applyUpgradeEffects(machine, baseCapacity, nil, basePowerPerCycle, baseWearPerCycle)
+    local capacity = upgradeEffects.capacity
+
+    -- v0.2 power gate: block new cycles when power is below the threshold.
+    -- Skipped when the power feature is off, or when the machine row lacks
+    -- power_level (schema v1 / test mocks that don't set it).
+    local powerFeatureEnabled = CZCraft.Config and CZCraft.Config.General
+        and CZCraft.Config.General.features and CZCraft.Config.General.features.power
+    local powerLevel = machine and tonumber(machine.power_level)
+    local powerSnapshot
+    if powerFeatureEnabled and powerLevel ~= nil then
+        if CZCraft.Power.isBlocked(powerLevel) then
+            CZCraft.MachinesRepo.setBlocked(machineUuid, 'power low', nil, machineVersion)
+            return 'blocked', 'power low'
+        end
+        local powerToConsume = upgradeEffects.powerPerCycle
+        powerSnapshot = CZCraft.Power.computeCycleSnapshot(powerLevel, powerToConsume)
+    end
+
+    -- v0.2 condition gate: block new cycles when condition is at or below the
+    -- block threshold. Skipped when the condition feature is off, or when the
+    -- machine row lacks condition (schema v1 / test mocks that don't set it).
+    -- An active cycle always finishes; the block only prevents NEW starts.
+    local conditionFeatureEnabled = CZCraft.Config and CZCraft.Config.General
+        and CZCraft.Config.General.features and CZCraft.Config.General.features.condition
+    local conditionLevel = machine and tonumber(machine.condition)
+    local conditionSnapshot
+    if conditionFeatureEnabled and conditionLevel ~= nil then
+        if CZCraft.Condition.isBlocked(conditionLevel) then
+            CZCraft.MachinesRepo.setBlocked(machineUuid, 'condition low', nil, machineVersion)
+            return 'blocked', 'condition low'
+        end
+        local wearToApply = upgradeEffects.wearPerCycle
+        conditionSnapshot = CZCraft.Condition.computeCycleSnapshot(conditionLevel, wearToApply)
+    end
 
     -- Build stockPlusReservedByItem and batchOutputByBill for bill selection.
     local stockPlusReservedByItem = {}
@@ -176,7 +269,7 @@ local function startNextCycle(machineUuid, machineVersion, machineType, now)
         batchOutputByBill[bill.bill_id] = recipe and batchOutputAmount(recipe) or 1
     end
 
-    local bill = CZCraft.Bills.selectNextBill(bills, stockPlusReservedByItem, batchOutputByBill)
+    local bill = CZCraft.Bills.selectNextBill(bills, stockPlusReservedByItem, batchOutputByBill, buildPrioritySortValues())
     if not bill then
         -- No runnable bill: machine is idle. Clear next_due_at so the scheduler
         -- stops popping it; a wake event (stock deposit, bill create) re-heaps.
@@ -230,10 +323,16 @@ local function startNextCycle(machineUuid, machineVersion, machineType, now)
         recipe_canonical = canonical,
         recipe_snapshot = snapshot,
         started_at = now,
-        duration_seconds = recipe.duration,
+        duration_seconds = upgradeEffects.duration or recipe.duration,
         reserved_output_weight = reservedOutputWeight,
         standard_cost = standardCost,
         stock_deltas = startDeltas.stockDeltas,
+        power_level_before = powerSnapshot and powerSnapshot.before or nil,
+        power_level_after = powerSnapshot and powerSnapshot.after or nil,
+        power_to_consume = powerSnapshot and powerSnapshot.powerToConsume or nil,
+        condition_before = conditionSnapshot and conditionSnapshot.before or nil,
+        condition_after = conditionSnapshot and conditionSnapshot.after or nil,
+        wear_to_apply = conditionSnapshot and conditionSnapshot.wearToApply or nil,
     })
     if not startOk then
         CZCraft.MachinesRepo.setBlocked(machineUuid, 'cycle start failed: ' .. tostring(startErr), nil, machineVersion)
@@ -242,7 +341,8 @@ local function startNextCycle(machineUuid, machineVersion, machineType, now)
 
     -- Re-heap with the new due time (CyclesRepo.start already set next_due_at,
     -- but the in-memory heap needs the wake).
-    CZCraft.SchedulerTick.wake(machineUuid, now + recipe.duration)
+    local effectiveDuration = upgradeEffects.duration or recipe.duration
+    CZCraft.SchedulerTick.wake(machineUuid, now + effectiveDuration)
     return 'started', nil
 end
 
@@ -332,12 +432,13 @@ local function completeActiveCycle(machineUuid, machineVersion, machineType, now
         end
     end
 
-    -- Reload the machine to get the fresh version (complete() bumped it).
+    -- Reload the machine to get the fresh version (complete() bumped it) and
+    -- the updated power_level (complete() applied power_level_after).
     local machine = CZCraft.MachinesRepo.load(machineUuid)
     local freshVersion = machine and tonumber(machine.version) or machineVersion + 1
 
     -- Start the next cycle or go idle/blocked.
-    startNextCycle(machineUuid, freshVersion, machineType, now)
+    startNextCycle(machineUuid, freshVersion, machineType, now, machine)
 end
 
 -- ===========================================================================
@@ -365,7 +466,7 @@ local function runCatchUp(machineUuid, machineVersion, machineType, lastComplete
         local bills = CZCraft.BillsRepo.listActiveForMachine(machineUuid)
         local stockRows = CZCraft.StockRepo.loadAll(machineUuid)
         local machineConfig = findMachineConfig(machineType)
-        local capacity = machineConfig and machineConfig.stockCapacity or 0
+        local baseCapacity = machineConfig and machineConfig.stockCapacity or 0
 
         local stockPlusReservedByItem = {}
         for _, bill in ipairs(bills) do
@@ -377,7 +478,7 @@ local function runCatchUp(machineUuid, machineVersion, machineType, lastComplete
             batchOutputByBill[bill.bill_id] = recipe and batchOutputAmount(recipe) or 1
         end
 
-        local bill = CZCraft.Bills.selectNextBill(bills, stockPlusReservedByItem, batchOutputByBill)
+        local bill = CZCraft.Bills.selectNextBill(bills, stockPlusReservedByItem, batchOutputByBill, buildPrioritySortValues())
         if not bill then
             CZCraft.MachinesRepo.clearNextDue(machineUuid, machineVersionFresh)
             return
@@ -393,19 +494,67 @@ local function runCatchUp(machineUuid, machineVersion, machineType, lastComplete
             return
         end
 
+        -- Compute upgrade-adjusted values for this machine.
+        local basePowerPerCycle = CZCraft.Power.computePowerConsumption()
+        local baseWearPerCycle = CZCraft.Condition.computeWear()
+        local upgradeEffects = applyUpgradeEffects(
+            machine, baseCapacity, recipe.duration, basePowerPerCycle, baseWearPerCycle
+        )
+        local capacity = upgradeEffects.capacity
+
+        -- v0.2 power gate for catch-up: if the machine is power-blocked, no
+        -- catch-up cycles run. The machine stays stopped with a block reason.
+        local powerFeatureEnabled = CZCraft.Config and CZCraft.Config.General
+            and CZCraft.Config.General.features and CZCraft.Config.General.features.power
+        local powerLevel = tonumber(machine.power_level)
+        local powerPerCycle = 0
+        if powerFeatureEnabled and powerLevel ~= nil then
+            if CZCraft.Power.isBlocked(powerLevel) then
+                CZCraft.MachinesRepo.setBlocked(machineUuid, 'power low', nil, machineVersionFresh)
+                return
+            end
+            powerPerCycle = upgradeEffects.powerPerCycle
+        end
+
+        -- v0.2 condition gate for catch-up: if the machine is condition-blocked,
+        -- no catch-up cycles run. Skipped when the condition feature is off or
+        -- the machine row lacks condition (schema v1 / test mocks).
+        local conditionFeatureEnabled = CZCraft.Config and CZCraft.Config.General
+            and CZCraft.Config.General.features and CZCraft.Config.General.features.condition
+        local conditionLevel = tonumber(machine.condition)
+        local wearPerCycle = 0
+        if conditionFeatureEnabled and conditionLevel ~= nil then
+            if CZCraft.Condition.isBlocked(conditionLevel) then
+                CZCraft.MachinesRepo.setBlocked(machineUuid, 'condition low', nil, machineVersionFresh)
+                return
+            end
+            wearPerCycle = upgradeEffects.wearPerCycle
+        end
+
         local itemWeights = buildItemWeights(recipe)
         local usedWeight = CZCraft.Storage.computeUsedWeight(stockRows, itemWeights)
         local reservedWeight = CZCraft.Storage.sumReserved(stockRows)
         local batch = batchOutputAmount(recipe)
 
+        -- Create a recipe copy with the upgrade-adjusted duration so the
+        -- catch-up domain computes cycles using the effective cycle time.
+        local effectiveRecipe = recipe
+        local effectiveDuration = upgradeEffects.duration or recipe.duration
+        if effectiveDuration ~= recipe.duration then
+            effectiveRecipe = {}
+            for k, v in pairs(recipe) do effectiveRecipe[k] = v end
+            effectiveRecipe.duration = effectiveDuration
+        end
+
         local result = CZCraft.CatchUp.computeCatchUpChunk({
             lastCompletedAt = cursor,
             now = now,
-            recipe = recipe,
+            recipe = effectiveRecipe,
             bill = {
                 mode = bill.mode,
                 target_quantity = tonumber(bill.target_quantity) or 0,
                 produced_quantity = tonumber(bill.produced_quantity) or 0,
+                until_threshold = tonumber(bill.until_threshold) or nil,
             },
             stockRows = stockRows,
             machineUsedWeight = usedWeight,
@@ -416,6 +565,45 @@ local function runCatchUp(machineUuid, machineVersion, machineType, lastComplete
             maxCyclesPerChunk = MAX_CYCLES_PER_CHUNK,
             stockPlusReservedByItem = stockPlusReservedByItem,
         })
+
+        -- Bound the chunk by available power: can't consume more than the
+        -- machine has. This prevents catch-up from driving power negative.
+        if powerPerCycle > 0 and result.cyclesToRun > 0 then
+            local maxCyclesByPower = math.floor(powerLevel / powerPerCycle)
+            if maxCyclesByPower < result.cyclesToRun then
+                result.cyclesToRun = maxCyclesByPower
+                -- Recompute chunk elapsed for the reduced cycle count.
+                result.nextChunkElapsed = result.cyclesToRun * effectiveDuration
+                result.shouldContinue = false
+                if result.cyclesToRun <= 0 then
+                    -- Not enough power for even one cycle: block.
+                    CZCraft.MachinesRepo.setBlocked(machineUuid, 'power low', nil, machineVersionFresh)
+                    return
+                end
+            end
+        end
+
+        -- Bound the chunk by available condition: can't wear the machine
+        -- below the block threshold. This prevents catch-up from driving
+        -- condition to 0 and leaving the machine stuck.
+        if wearPerCycle > 0 and result.cyclesToRun > 0 then
+            local cfg = CZCraft.Config.Balance.condition
+            local blockThreshold = cfg and cfg.blockThreshold or 20
+            -- Cycles until condition hits the block threshold.
+            local maxCyclesByCondition = math.floor(
+                (conditionLevel - blockThreshold) / wearPerCycle
+            )
+            if maxCyclesByCondition < result.cyclesToRun then
+                result.cyclesToRun = math.max(0, maxCyclesByCondition)
+                result.nextChunkElapsed = result.cyclesToRun * effectiveDuration
+                result.shouldContinue = false
+                if result.cyclesToRun <= 0 then
+                    -- Not enough condition for even one cycle: block.
+                    CZCraft.MachinesRepo.setBlocked(machineUuid, 'condition low', nil, machineVersionFresh)
+                    return
+                end
+            end
+        end
 
         if result.cyclesToRun <= 0 then
             if result.blockReason then
@@ -446,6 +634,8 @@ local function runCatchUp(machineUuid, machineVersion, machineType, lastComplete
             standard_cost = CZCraft.RecipeSnapshot.standardCost(recipe, {}) or 0,
             idempotency_key = idempotencyKey,
             event_id = generateUuid(),
+            power_to_consume = powerPerCycle * result.cyclesToRun,
+            wear_to_apply = wearPerCycle * result.cyclesToRun,
         })
         if not ok then
             -- Chunk failed: re-heap so the next tick retries from the cursor.
@@ -484,7 +674,7 @@ local function runCatchUp(machineUuid, machineVersion, machineType, lastComplete
     -- go idle/blocked if no bill is runnable.
     local machine = CZCraft.MachinesRepo.load(machineUuid)
     if not machine then return end
-    startNextCycle(machineUuid, tonumber(machine.version) or machineVersion, machineType, now)
+    startNextCycle(machineUuid, tonumber(machine.version) or machineVersion, machineType, now, machine)
 end
 
 -- ===========================================================================

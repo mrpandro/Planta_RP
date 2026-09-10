@@ -80,7 +80,10 @@ local function createGhost(propModel)
     SetEntityAlpha(ghostEntity, 180, false)
     SetEntityCollision(ghostEntity, false, false)
     SetEntityDrawOutline(ghostEntity, true)
-    PlaceObjectOnGroundProperly(ghostEntity)
+    -- Use the raycast hit z directly; it already targets the shell floor
+    -- (collision flag 1 includes buildings/shells). PlaceObjectOnGroundProperly
+    -- would override this with the world terrain height, burying the ghost
+    -- inside a house shell.
     SetEntityHeading(ghostEntity, placementRotation)
 end
 
@@ -89,8 +92,8 @@ local function updateGhost()
     if not ghostEntity or not DoesEntityExist(ghostEntity) then return end
     local hitCoords = raycastGround()
     if hitCoords then
+        -- Raycast z is the shell floor; do not re-snap to world terrain.
         SetEntityCoords(ghostEntity, hitCoords.x, hitCoords.y, hitCoords.z, false, false, false, true)
-        PlaceObjectOnGroundProperly(ghostEntity)
     end
     SetEntityHeading(ghostEntity, placementRotation)
 end
